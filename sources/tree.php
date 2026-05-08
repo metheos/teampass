@@ -98,6 +98,7 @@ $data = [
     'userCanCreateRootFolder' => null !== $session->get('user-can_create_root_folder') ? json_encode($session->get('user-can_create_root_folder')) : '{}',
     'userTreeLoadStrategy' => null !== $session->get('user-tree_load_strategy') ? $session->get('user-tree_load_strategy') : '',
     'treeVersion' => null !== $request->query->get('tree_version') ? $request->query->get('tree_version') : '',
+    'searchTerm' => null !== $request->query->get('search_term') ? $request->query->get('search_term') : '',
 ];
 
 $filters = [
@@ -117,12 +118,19 @@ $filters = [
     'userCanCreateRootFolder' => 'cast:array',
     'userTreeLoadStrategy' => 'trim|escape',
     'treeVersion' => 'trim|escape',
+    'searchTerm' => 'trim|escape',
 ];
 
 $inputData = dataSanitizer(
     $data,
     $filters
 );
+
+$searchTerm = trim((string) ($inputData['searchTerm'] ?? ''));
+if (mb_strlen($searchTerm) < 6) {
+    echo json_encode(['unchanged' => false, 'version' => '', 'tree' => []]);
+    exit;
+}
 
 $lastFolderChange = DB::queryFirstRow(
     'SELECT valeur FROM ' . prefixTable('misc') . '
@@ -148,7 +156,7 @@ $goTreeRefresh = loadTreeStrategy(
 if ($goTreeRefresh['state'] === true || empty($inputData['nodeId']) === false) {
     // Build tree
     $tree = new NestedTree(prefixTable('nested_tree'), 'id', 'parent_id', 'title');
-    
+
     // list of items accessible but not in an allowed folder
     if (
         isset($inputData['restrictedFoldersForItems']) === true
@@ -158,7 +166,7 @@ if ($goTreeRefresh['state'] === true || empty($inputData['nodeId']) === false) {
     } else {
         $listRestrictedFoldersForItemsKeys = array();
     }
-    
+
     $ret_json = array();
     $completTree = [];
     $last_visible_parent = -1;
@@ -171,8 +179,7 @@ if ($goTreeRefresh['state'] === true || empty($inputData['nodeId']) === false) {
         $inputData['forbidenPfs'],
         $inputData['visibleFolders'],
         $listRestrictedFoldersForItemsKeys
-    ) === true)
-    {
+    ) === true) {
         // Note: Condition with sequential/full option has been removed (see #4900)
         $completTree = $tree->getTreeWithChildren();
         foreach ($completTree[0]->children as $child) {
@@ -209,22 +216,84 @@ if ($goTreeRefresh['state'] === true || empty($inputData['nodeId']) === false) {
         $visibleFoldersJson
     );
 
+    $filteredTree = filterTreeNodesBySearch(json_decode($ret_json, true) ?? [], $searchTerm);
+    $filteredTreeJson = json_encode($filteredTree);
+
     // Send back with version for client-side caching
-    $treeVersion = md5($ret_json);
+    $treeVersion = md5($filteredTreeJson);
     if (!empty($inputData['treeVersion']) && $inputData['treeVersion'] === $treeVersion) {
         echo json_encode(['unchanged' => true, 'version' => $treeVersion]);
     } else {
-        echo json_encode(['unchanged' => false, 'version' => $treeVersion, 'tree' => json_decode($ret_json)]);
+        echo json_encode(['unchanged' => false, 'version' => $treeVersion, 'tree' => $filteredTree]);
     }
 } else {
     // Cached data path — also version it
     $cachedData = $goTreeRefresh['data'];
-    $treeVersion = md5($cachedData);
+    $cachedTree = json_decode((string) $cachedData, true) ?? [];
+    $filteredTree = filterTreeNodesBySearch($cachedTree, $searchTerm);
+    $treeVersion = md5(json_encode($filteredTree));
     if (!empty($inputData['treeVersion']) && $inputData['treeVersion'] === $treeVersion) {
         echo json_encode(['unchanged' => true, 'version' => $treeVersion]);
     } else {
-        echo json_encode(['unchanged' => false, 'version' => $treeVersion, 'tree' => json_decode($cachedData)]);
+        echo json_encode(['unchanged' => false, 'version' => $treeVersion, 'tree' => $filteredTree]);
     }
+}
+
+
+/**
+ * Filter tree nodes to folders matching search term and keep ancestors for navigation context.
+ *
+ * @param array $treeNodes
+ * @param string $searchTerm
+ * @return array
+ */
+function filterTreeNodesBySearch(array $treeNodes, string $searchTerm): array
+{
+    $needle = mb_strtolower(trim($searchTerm));
+    if ($needle === '') {
+        return [];
+    }
+
+    $indexedNodes = [];
+    foreach ($treeNodes as $node) {
+        if (isset($node['id']) === true && is_string($node['id']) === true) {
+            $indexedNodes[$node['id']] = $node;
+        }
+    }
+
+    $keptNodeIds = [];
+    foreach ($treeNodes as $node) {
+        if (!isset($node['id']) || !is_string($node['id'])) {
+            continue;
+        }
+
+        $label = '';
+        if (isset($node['a_attr']['data-title']) && is_string($node['a_attr']['data-title'])) {
+            $label = html_entity_decode($node['a_attr']['data-title'], ENT_QUOTES);
+        } elseif (isset($node['text']) && is_string($node['text'])) {
+            $label = html_entity_decode(strip_tags($node['text']), ENT_QUOTES);
+        }
+
+        if ($label !== '' && mb_stripos($label, $needle) !== false) {
+            $currentNodeId = $node['id'];
+            while ($currentNodeId !== '#' && isset($indexedNodes[$currentNodeId])) {
+                $keptNodeIds[$currentNodeId] = true;
+                $parentNodeId = isset($indexedNodes[$currentNodeId]['parent']) && is_string($indexedNodes[$currentNodeId]['parent'])
+                    ? $indexedNodes[$currentNodeId]['parent']
+                    : '#';
+                $currentNodeId = $parentNodeId;
+            }
+        }
+    }
+
+    $filteredNodes = [];
+    foreach ($treeNodes as $node) {
+        if (isset($node['id']) && isset($keptNodeIds[$node['id']])) {
+            $filteredNodes[] = $node;
+        }
+    }
+
+    return $filteredNodes;
 }
 
 
@@ -295,16 +364,15 @@ function showFolderToUser(
     array $session_forbiden_pfs,
     array $session_groupes_visibles,
     array $listRestrictedFoldersForItemsKeys
-): bool
-{
+): bool {
     $big_array = array_diff(
         array_unique(
             array_merge(
-                $session_groupes_visibles, 
+                $session_groupes_visibles,
                 $listRestrictedFoldersForItemsKeys
-            ), 
+            ),
             SORT_NUMERIC
-        ), 
+        ),
         $session_forbiden_pfs
     );
     if ($nodeId === 0 || in_array($nodeId, $big_array) === true) {
@@ -348,7 +416,7 @@ function recursiveTree(
     $nodeDescendants = getDescendantNodesFromTree($completTree, $nodeId, true);
     // On combine les tableaux une seule fois pour optimiser
     $allowedFolders = array_merge($inputData['personalFolders'], $inputData['visibleFolders']);
-    
+
     foreach ($nodeDescendants as $node) {
         if (!in_array($node->id, $allowedFolders)) {
             continue;
@@ -356,13 +424,13 @@ function recursiveTree(
 
         // If it is a personal folder, we check the specific conditions
         if (
-            (int) $node->personal_folder === 1 
-            && (int) $SETTINGS['enable_pf_feature'] === 1 
+            (int) $node->personal_folder === 1
+            && (int) $SETTINGS['enable_pf_feature'] === 1
             && !in_array($node->id, $inputData['personalFolders'])
         ) {
             continue;
         }
-        
+
         // If we are here, the node must be displayed
         $displayThisNode = true;
         $nbItemsInSubfolders = (int) $node->nb_items_in_subfolders;
@@ -370,7 +438,7 @@ function recursiveTree(
         $nbSubfolders = (int) $node->nb_subfolders;
         break;  // Get out as soon as we find a valid node.
     }
-    
+
     if ($displayThisNode === true) {
         handleNode(
             (int) $nodeId,
@@ -388,7 +456,7 @@ function recursiveTree(
             $ret_json
         );
     }
-    
+
     return $ret_json;
 }
 
@@ -424,8 +492,7 @@ function handleNode(
     int $nbSubfolders,
     int $nbItemsInFolder,
     array &$ret_json = array()
-)
-{
+) {
     // If personal Folder, convert id into user name
     if ((int) $currentNode->title === (int) $inputData['userId'] && (int) $currentNode->nlevel === 1) {
         $currentNode->title = $inputData['userLogin'];
@@ -462,7 +529,7 @@ function handleNode(
         $text,
         $nbSubfolders,
         $SETTINGS
-    );    
+    );
     $last_visible_parent = $tmpRetArray['last_visible_parent'];
     $last_visible_parent_level = $tmpRetArray['last_visible_parent_level'];
     $ret_json = $tmpRetArray['ret_json'];
@@ -517,8 +584,7 @@ function prepareNodeJson(
     string $text,
     int $nbSubfolders,
     array $SETTINGS
-): array
-{
+): array {
     $session = SessionManager::getSession();
     // Load user's language
     $lang = new Language($session->get('user-language') ?? 'english');
@@ -543,7 +609,7 @@ function prepareNodeJson(
             array(
                 'id' => 'li_' . $nodeId,
                 'parent' => $last_visible_parent === -1 ? $parent : $last_visible_parent,
-                'text' => '<i class="'.$currentNode->fa_icon.' tree-folder mr-2" data-folder="'.$currentNode->fa_icon.'"  data-folder-selected="'.$currentNode->fa_icon_selected.'"></i>'.$text.htmlspecialchars($currentNode->title).$nodeData['html'],
+                'text' => '<i class="' . $currentNode->fa_icon . ' tree-folder mr-2" data-folder="' . $currentNode->fa_icon . '"  data-folder-selected="' . $currentNode->fa_icon_selected . '"></i>' . $text . htmlspecialchars($currentNode->title) . $nodeData['html'],
                 'li_attr' => array(
                     'class' => 'jstreeopen',
                     'title' => 'ID [' . $nodeId . '] ' . $nodeData['title'],
@@ -558,18 +624,17 @@ function prepareNodeJson(
                 'can_edit' => (int) $inputData['userCanCreateRootFolder'],
             )
         );
-        
+
         if ($inputData['userTreeLoadStrategy'] === 'sequential') {
             $ret_json[count($ret_json) - 1]['children'] = $nbSubfolders > 0 ? true : false;
         }
-
     } elseif ($nodeData['show_but_block'] === true) {
         array_push(
             $ret_json,
             array(
                 'id' => 'li_' . $nodeId,
                 'parent' => $last_visible_parent === -1 ? $parent : $last_visible_parent,
-                'text' => '<i class="'.$currentNode->fa_icon.' tree-folder mr-2" data-folder="'.$currentNode->fa_icon.'"  data-folder-selected="'.$currentNode->fa_icon_selected.'"></i>'.'<i class="fas fa-times fa-xs text-danger mr-1 ml-1"></i>'.$text.htmlspecialchars($currentNode->title).$nodeData['html'],
+                'text' => '<i class="' . $currentNode->fa_icon . ' tree-folder mr-2" data-folder="' . $currentNode->fa_icon . '"  data-folder-selected="' . $currentNode->fa_icon_selected . '"></i>' . '<i class="fas fa-times fa-xs text-danger mr-1 ml-1"></i>' . $text . htmlspecialchars($currentNode->title) . $nodeData['html'],
                 'li_attr' => array(
                     'class' => '',
                     'title' => 'ID [' . $nodeId . '] ' . $lang->get('no_access'),
@@ -617,8 +682,7 @@ function prepareNodeData(
     array $session_list_restricted_folders_for_items,
     array $session_personal_folder,
     array $completTree
-): array
-{
+): array {
     $session = SessionManager::getSession();
     // Load user's language
     $lang = new Language($session->get('user-language') ?? 'english');
@@ -627,8 +691,8 @@ function prepareNodeData(
         // special case for READ-ONLY folder
         if (in_array($nodeId, $session_read_only_folders) === true) {
             return [
-                'html' => '<i class="far fa-eye fa-xs mr-1 ml-1"></i>'.
-                    ($tree_counters === 1 ? '<span class="badge badge-pill badge-light ml-2 items_count" id="itcount_' . $nodeId . '">' . $nbItemsInFolder .'/'.$nbItemsInSubfolders .'/'.$nbSubfolders. '</span>'  : ''),
+                'html' => '<i class="far fa-eye fa-xs mr-1 ml-1"></i>' .
+                    ($tree_counters === 1 ? '<span class="badge badge-pill badge-light ml-2 items_count" id="itcount_' . $nodeId . '">' . $nbItemsInFolder . '/' . $nbItemsInSubfolders . '/' . $nbSubfolders . '</span>'  : ''),
                 'title' => $lang->get('read_only_account'),
                 'restricted' => 1,
                 'folderClass' => 'folder_not_droppable',
@@ -636,14 +700,13 @@ function prepareNodeData(
                 'hide_node' => false,
                 'is_pf' => in_array($nodeId, $session_personal_folder) === true ? 1 : 0,
             ];
-
         } elseif (
             $session_user_read_only === true
             && in_array($nodeId, $session_personal_visible_groups) === false
         ) {
             return [
-                'html' => '<i class="far fa-eye fa-xs mr-1"></i>'.
-                    ($tree_counters === 1 ? '<span class="badge badge-pill badge-light ml-2 items_count" id="itcount_' . $nodeId . '">' . $nbItemsInFolder .'/'.$nbItemsInSubfolders .'/'.$nbSubfolders. '</span>'  : ''),
+                'html' => '<i class="far fa-eye fa-xs mr-1"></i>' .
+                    ($tree_counters === 1 ? '<span class="badge badge-pill badge-light ml-2 items_count" id="itcount_' . $nodeId . '">' . $nbItemsInFolder . '/' . $nbItemsInSubfolders . '/' . $nbSubfolders . '</span>'  : ''),
                 'title' => $lang->get('read_only_account'),
                 'restricted' => 0,
                 'folderClass' => 'folder',
@@ -652,9 +715,9 @@ function prepareNodeData(
                 'is_pf' => in_array($nodeId, $session_personal_folder) === true ? 1 : 0,
             ];
         }
-        
+
         return [
-            'html' => ($tree_counters === 1 ? '<span class="badge badge-pill badge-light ml-2 items_count" id="itcount_' . $nodeId . '">' . $nbItemsInFolder .'/'.$nbItemsInSubfolders .'/'.$nbSubfolders. '</span>'  : ''),
+            'html' => ($tree_counters === 1 ? '<span class="badge badge-pill badge-light ml-2 items_count" id="itcount_' . $nodeId . '">' . $nbItemsInFolder . '/' . $nbItemsInSubfolders . '/' . $nbSubfolders . '</span>'  : ''),
             'title' => '',
             'restricted' => 0,
             'folderClass' => 'folder',
@@ -662,7 +725,6 @@ function prepareNodeData(
             'hide_node' => false,
             'is_pf' => in_array($nodeId, $session_personal_folder) === true ? 1 : 0,
         ];
-
     } elseif (in_array($nodeId, $listRestrictedFoldersForItemsKeys) === true) {
         return [
             'html' => $session_user_read_only === true ? '<i class="far fa-eye fa-xs mr-1"></i>' : '' .
@@ -674,8 +736,8 @@ function prepareNodeData(
             'hide_node' => false,
             'is_pf' => in_array($nodeId, $session_personal_folder) === true ? 1 : 0,
         ];
-
-    } elseif ((int) $nbSubfolders === 0
+    } elseif (
+        (int) $nbSubfolders === 0
         //&& (int) $show_only_accessible_folders === 1
     ) {
         // folder should not be visible
@@ -703,7 +765,7 @@ function prepareNodeData(
                 'is_pf' => in_array($nodeId, $session_personal_folder) === true ? 1 : 0,
             ];
         }
-        
+
         // hide it
         return [
             'html' => '',
@@ -812,8 +874,7 @@ function loadTreeStrategy(
     array $userSessionTreeStructure,
     int $userId,
     int $forceRefresh
-): array
-{
+): array {
     // Case when refresh is EXPECTED / MANDATORY
     if ((int) $forceRefresh === 1) {
         return [

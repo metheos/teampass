@@ -36,7 +36,7 @@ use TeampassClasses\ConfigManager\ConfigManager;
 use TeampassClasses\Language\Language;
 
 // Load functions
-require_once __DIR__.'/../sources/main.functions.php';
+require_once __DIR__ . '/../sources/main.functions.php';
 
 // init
 loadClasses();
@@ -92,11 +92,31 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
     // Minimum word count and extra suffix requirements per folder complexity level
     const TP_PASSPHRASE_RULES = {
-        0:  { minWords: 3, capitalize: false, appendSuffix: false },
-        20: { minWords: 3, capitalize: false, appendSuffix: false },
-        38: { minWords: 3, capitalize: true,  appendSuffix: false },
-        48: { minWords: 4, capitalize: true,  appendSuffix: false },
-        60: { minWords: 4, capitalize: true,  appendSuffix: true  },
+        0: {
+            minWords: 3,
+            capitalize: false,
+            appendSuffix: false
+        },
+        20: {
+            minWords: 3,
+            capitalize: false,
+            appendSuffix: false
+        },
+        38: {
+            minWords: 3,
+            capitalize: true,
+            appendSuffix: false
+        },
+        48: {
+            minWords: 4,
+            capitalize: true,
+            appendSuffix: false
+        },
+        60: {
+            minWords: 4,
+            capitalize: true,
+            appendSuffix: true
+        },
     };
 
     var requestRunning = false,
@@ -109,7 +129,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         screenHeight = $(window).height(),
         quick_icon_query_status = true,
         first_group = 1,
-        folderSearchCriteria = $('#jstree_search').val(),
+        folderSearchCriteria = '',
+        activeFolderSearchTerm = '',
+        hasSubmittedFolderSearch = false,
         userDidAChange = false,
         userUploadedFile = false,
         selectedFolder = false,
@@ -187,185 +209,218 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         console.log(store.get('teampassUser'))
     }
 
-    // Show loader
+    // Prompt user to search before loading any folder in the tree
     toastr.remove();
-    toastr.info('<?php echo $lang->get('loading_data'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>');
+    toastr.info('<?php echo $lang->get('find'); ?> folders with at least 6 characters to load results.');
 
     // Build tree
     $('#jstree').jstree({
-        'core': {
-            'animation': 0,
-            'check_callback': true,
-            'data': function(node, callback) {
-                if (debugJavascript === true) {
-                    console.info('Les répertoires sont chargés');
-                    console.log(node);
-                }
-                var treeVersion = ''
-                try { treeVersion = localStorage.getItem('tp_tree_version') || '' } catch(e) {}
+            'core': {
+                'animation': 0,
+                'check_callback': true,
+                'data': function(node, callback) {
+                    if (activeFolderSearchTerm.length < 6) {
+                        callback([])
+                        return
+                    }
 
-                var forceRefresh = store.get('teampassApplication') !== undefined ?
-                    store.get('teampassApplication').jstreeForceRefresh : 0
+                    if (debugJavascript === true) {
+                        console.info('Les répertoires sont chargés');
+                        console.log(node);
+                    }
+                    var treeVersion = ''
+                    try {
+                        treeVersion = localStorage.getItem('tp_tree_version') || ''
+                    } catch (e) {}
 
-                // Clear localStorage version on force refresh to get fresh data
-                if (parseInt(forceRefresh) === 1) {
-                    treeVersion = ''
-                    try { localStorage.removeItem('tp_tree_version') } catch(e) {}
-                }
+                    var forceRefresh = store.get('teampassApplication') !== undefined ?
+                        store.get('teampassApplication').jstreeForceRefresh : 0
 
-                $.ajax({
-                    url: './sources/tree.php',
-                    dataType: 'json',
-                    data: {
-                        'id': node.id.split('_')[1],
-                        'force_refresh': forceRefresh,
-                        'tree_version': treeVersion
-                    },
-                    success: function(response) {
-                        if (response && response.unchanged === true) {
-                            // Use cached data from localStorage
+                    // Clear localStorage version on force refresh to get fresh data
+                    if (parseInt(forceRefresh) === 1) {
+                        treeVersion = ''
+                        try {
+                            localStorage.removeItem('tp_tree_version')
+                        } catch (e) {}
+                    }
+
+                    $.ajax({
+                        url: './sources/tree.php',
+                        dataType: 'json',
+                        data: {
+                            'id': node.id.split('_')[1],
+                            'force_refresh': forceRefresh,
+                            'tree_version': treeVersion,
+                            'search_term': activeFolderSearchTerm
+                        },
+                        success: function(response) {
+                            if (response && response.unchanged === true) {
+                                // Use cached data from localStorage
+                                try {
+                                    var cached = JSON.parse(localStorage.getItem('tp_tree_data'))
+                                    if (cached) {
+                                        callback(cached)
+                                        return
+                                    }
+                                } catch (e) {}
+                                // Fallback: if cache corrupted, reload without version
+                                $.ajax({
+                                    url: './sources/tree.php',
+                                    dataType: 'json',
+                                    data: {
+                                        'id': node.id.split('_')[1],
+                                        'force_refresh': 1,
+                                        'search_term': activeFolderSearchTerm
+                                    },
+                                    success: function(resp) {
+                                        var treeData = resp.tree || resp
+                                        try {
+                                            localStorage.setItem('tp_tree_version', resp.version || '')
+                                            localStorage.setItem('tp_tree_data', JSON.stringify(treeData))
+                                        } catch (e) {}
+                                        callback(treeData)
+                                    }
+                                })
+                            } else if (response && response.tree) {
+                                // New data received
+                                try {
+                                    localStorage.setItem('tp_tree_version', response.version || '')
+                                    localStorage.setItem('tp_tree_data', JSON.stringify(response.tree))
+                                } catch (e) {}
+                                callback(response.tree)
+                            } else {
+                                // Fallback for unexpected response format (raw array)
+                                callback(response)
+                            }
+                        },
+                        error: function() {
+                            // On error, try localStorage fallback
                             try {
                                 var cached = JSON.parse(localStorage.getItem('tp_tree_data'))
                                 if (cached) {
                                     callback(cached)
                                     return
                                 }
-                            } catch(e) {}
-                            // Fallback: if cache corrupted, reload without version
-                            $.ajax({
-                                url: './sources/tree.php',
-                                dataType: 'json',
-                                data: {
-                                    'id': node.id.split('_')[1],
-                                    'force_refresh': 1
-                                },
-                                success: function(resp) {
-                                    var treeData = resp.tree || resp
-                                    try {
-                                        localStorage.setItem('tp_tree_version', resp.version || '')
-                                        localStorage.setItem('tp_tree_data', JSON.stringify(treeData))
-                                    } catch(e) {}
-                                    callback(treeData)
-                                }
-                            })
-                        } else if (response && response.tree) {
-                            // New data received
-                            try {
-                                localStorage.setItem('tp_tree_version', response.version || '')
-                                localStorage.setItem('tp_tree_data', JSON.stringify(response.tree))
-                            } catch(e) {}
-                            callback(response.tree)
-                        } else {
-                            // Fallback for unexpected response format (raw array)
-                            callback(response)
+                            } catch (e) {}
+                            callback([])
                         }
-                    },
-                    error: function() {
-                        // On error, try localStorage fallback
-                        try {
-                            var cached = JSON.parse(localStorage.getItem('tp_tree_data'))
-                            if (cached) {
-                                callback(cached)
-                                return
-                            }
-                        } catch(e) {}
-                        callback([])
-                    }
-                })
+                    })
+                },
+                'strings': {
+                    'Loading ...': '<?php echo $lang->get('loading'); ?>...'
+                },
+                'themes': {
+                    'icons': false,
+                },
             },
-            'strings': {
-                'Loading ...': '<?php echo $lang->get('loading'); ?>...'
-            },
-            'themes': {
-                'icons': false,
-            },
-        },
-        'plugins': [
-            'state', 'search'
-        ]
-    })
-    // On node select
-    .bind('select_node.jstree', function(e, data) {
-        if (debugJavascript === true) console.log('JSTREE BIND');
-        selectedFolder = $('#jstree').jstree('get_selected', true)[0]
-        selectedFolderId = parseInt(selectedFolder.id.split('_')[1]);
-
-        // manage icon open/closed
-        var selectedFolderIcon = $('#fld_'+selectedFolderId).children('.tree-folder').attr('data-folder'),
-            selectedFolderIconSelected = $('#fld_'+selectedFolderId).children('.tree-folder').attr('data-folder-selected');
-
-        // remove selected on previous folder
-        $($('#fld_'+previousSelectedFolder).children('.tree-folder'))
-            .removeClass($('#fld_'+previousSelectedFolder).children('.tree-folder').attr('data-folder-selected'))
-            .addClass($('#fld_'+previousSelectedFolder).children('.tree-folder').attr('data-folder'));
-        // show selected icon
-        $('#fld_'+selectedFolderId).children('.tree-folder')
-            .removeClass(selectedFolderIcon)
-            .addClass(selectedFolderIconSelected);
-
-        if (debugJavascript === true) {
-            console.info('SELECTED NODE ' + selectedFolderId + " -- " + startedItemsListQuery);
-            console.log(selectedFolder);
-            console.log(selectedFolder.original.is_pf)
-        }
-
-        store.update(
-            'teampassApplication',
-            function(teampassApplication) {
-                teampassApplication.selectedFolder = selectedFolderId,
-                teampassApplication.itemsListFolderId = selectedFolderId,
-                teampassApplication.selectedFolderTitle = selectedFolder.a_attr['data-title'],
-                teampassApplication.selectedFolderParentId = selectedFolder.parent !== "#" ? selectedFolder.parent.split('_')[1] : 0,
-                teampassApplication.selectedFolderParentTitle = selectedFolder.a_attr['data-title'],
-                teampassApplication.selectedFolderIcon = selectedFolderIcon,
-                teampassApplication.selectedFolderIconSelected = selectedFolderIconSelected,
-                teampassApplication.selectedFolderIsPF = selectedFolder.original.is_pf,
-                teampassApplication.userCanEdit = selectedFolder.original.can_edit
-            }
-        )
-        store.update(
-            'teampassItem',
-            function(teampassItem) {
-                teampassItem.folderId = selectedFolderId
-            }
-        );
-        
-        // Prepare list of items
-        if (startedItemsListQuery === false) {
-            startedItemsListQuery = true;
-            ListerItems(selectedFolderId, '', 0, 0, true);
-        }
-
-        previousSelectedFolder = selectedFolderId;
-        initialPageLoad = false;
-
-        // Subscribe to WebSocket notifications for this folder
-        if (typeof window.tpWsSubscribeToFolder === 'function') {
-            window.tpWsSubscribeToFolder(selectedFolderId);
-        }
-    })
-    // Search in tree
-    .bind('search.jstree', function(e, data) {
-        if (data.nodes.length == 1) {
-            //open the folder
-            startedItemsListQuery = true;
-            ListerItems($('#jstree li>a.jstree-search').attr('id').split('_')[1], '', 0, 0, true);
-        }
-    });
-
-    // Find folders in jstree
-    $('#jstree_search')
-        .keypress(function(e) {
-            if (e.keyCode === 13) {
-                $('#jstree').jstree('search', $('#jstree_search').val());
-            }
+            'plugins': [
+                'state', 'search'
+            ]
         })
-        .focus(function() {
-            $(this).val('');
-        })
-        .blur(function() {
-            $(this).val(folderSearchCriteria);
+        // On node select
+        .bind('select_node.jstree', function(e, data) {
+            if (debugJavascript === true) console.log('JSTREE BIND');
+            selectedFolder = $('#jstree').jstree('get_selected', true)[0]
+            selectedFolderId = parseInt(selectedFolder.id.split('_')[1]);
+
+            // manage icon open/closed
+            var selectedFolderIcon = $('#fld_' + selectedFolderId).children('.tree-folder').attr('data-folder'),
+                selectedFolderIconSelected = $('#fld_' + selectedFolderId).children('.tree-folder').attr('data-folder-selected');
+
+            // remove selected on previous folder
+            $($('#fld_' + previousSelectedFolder).children('.tree-folder'))
+                .removeClass($('#fld_' + previousSelectedFolder).children('.tree-folder').attr('data-folder-selected'))
+                .addClass($('#fld_' + previousSelectedFolder).children('.tree-folder').attr('data-folder'));
+            // show selected icon
+            $('#fld_' + selectedFolderId).children('.tree-folder')
+                .removeClass(selectedFolderIcon)
+                .addClass(selectedFolderIconSelected);
+
+            if (debugJavascript === true) {
+                console.info('SELECTED NODE ' + selectedFolderId + " -- " + startedItemsListQuery);
+                console.log(selectedFolder);
+                console.log(selectedFolder.original.is_pf)
+            }
+
+            store.update(
+                'teampassApplication',
+                function(teampassApplication) {
+                    teampassApplication.selectedFolder = selectedFolderId,
+                        teampassApplication.itemsListFolderId = selectedFolderId,
+                        teampassApplication.selectedFolderTitle = selectedFolder.a_attr['data-title'],
+                        teampassApplication.selectedFolderParentId = selectedFolder.parent !== "#" ? selectedFolder.parent.split('_')[1] : 0,
+                        teampassApplication.selectedFolderParentTitle = selectedFolder.a_attr['data-title'],
+                        teampassApplication.selectedFolderIcon = selectedFolderIcon,
+                        teampassApplication.selectedFolderIconSelected = selectedFolderIconSelected,
+                        teampassApplication.selectedFolderIsPF = selectedFolder.original.is_pf,
+                        teampassApplication.userCanEdit = selectedFolder.original.can_edit
+                }
+            )
+            store.update(
+                'teampassItem',
+                function(teampassItem) {
+                    teampassItem.folderId = selectedFolderId
+                }
+            );
+
+            // Prepare list of items
+            if (startedItemsListQuery === false) {
+                startedItemsListQuery = true;
+                ListerItems(selectedFolderId, '', 0, 0, true);
+            }
+
+            previousSelectedFolder = selectedFolderId;
+            initialPageLoad = false;
+
+            // Subscribe to WebSocket notifications for this folder
+            if (typeof window.tpWsSubscribeToFolder === 'function') {
+                window.tpWsSubscribeToFolder(selectedFolderId);
+            }
         });
+
+    // Submit-driven folder search (minimum 6 chars)
+    $('#folder-search-form').on('submit', function(e) {
+        e.preventDefault()
+
+        const searchValue = $.trim($('#jstree_search').val())
+        if (searchValue.length < 6) {
+            toastr.remove()
+            toastr.warning('Please enter at least 6 characters to search folders.')
+            return false
+        }
+
+        folderSearchCriteria = searchValue
+        activeFolderSearchTerm = searchValue
+        hasSubmittedFolderSearch = true
+
+        // Reset cached tree snapshots when search criteria changes.
+        try {
+            localStorage.removeItem('tp_tree_version')
+            localStorage.removeItem('tp_tree_data')
+            localStorage.removeItem('tp_folders_version')
+        } catch (e) {}
+
+        store.update('teampassApplication', function(teampassApplication) {
+            teampassApplication.jstreeForceRefresh = 1
+            teampassApplication.folderTreeSearchTerm = searchValue
+        })
+
+        toastr.remove()
+        toastr.info('<?php echo $lang->get('searching'); ?>')
+
+        $('#jstree').one('refresh.jstree', function() {
+            refreshTree('', false, true)
+            $('#jstree').jstree('open_all')
+
+            store.update('teampassApplication', function(teampassApplication) {
+                teampassApplication.jstreeForceRefresh = 0
+            })
+
+            toastr.remove()
+        })
+
+        $('#jstree').jstree(true).refresh(true)
+    })
 
     // Is this a short url
     var queryDict = {},
@@ -380,7 +435,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
     ) {
         // Show cog
         toastr.remove();
-        loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
+        loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', {
+            timeOut: 0
+        });
 
         // Store current view
         savePreviousView();
@@ -414,21 +471,20 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         }
     });
 
-    // Load list of visible folders once jstree data is ready
-    // Uses loaded.jstree event instead of arbitrary 500ms delay
-    $('#jstree').one('loaded.jstree', function() {
-        // Refresh visible folders / session rights, then select the current folder.
-        // do_refresh=false: the tree just loaded, no second rebuild needed.
-        let groupe_id = store.get('teampassApplication').itemsListFolderId ||
-                        store.get('teampassApplication').selectedFolder || '';
-
-        refreshTree(groupe_id, false, true);
-    });
+    // Restore previous folder search term if available.
+    if (store.get('teampassApplication') !== undefined &&
+        typeof store.get('teampassApplication').folderTreeSearchTerm === 'string' &&
+        store.get('teampassApplication').folderTreeSearchTerm.length >= 6
+    ) {
+        activeFolderSearchTerm = store.get('teampassApplication').folderTreeSearchTerm
+        folderSearchCriteria = activeFolderSearchTerm
+        $('#jstree_search').val(activeFolderSearchTerm)
+    }
 
     // What do we do if a folder is selected?
     if (store.get('teampassApplication') !== undefined &&
         store.get('teampassApplication').selectedFolder !== undefined &&
-        store.get('teampassApplication').selectedFolder !== '' && 
+        store.get('teampassApplication').selectedFolder !== '' &&
         showItemOnPageLoad === true
     ) {
         startedItemsListQuery = true;
@@ -439,7 +495,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         ListerItems(store.get('teampassApplication').itemsListFolderId, '', 0);
     } else {
         // What if no folder is selected?
-        
+
         // Hide list of subfolders
         $('#table_teampass_subfolders_list').addClass('hidden');
     }
@@ -489,14 +545,14 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
     $('#table_teampass_items_list').toggleClass('tp-show-corrupted-items', showCorruptedItemsInList === true);
 
     $(document).on('blur', '#form-item-icon', function() {
-        $('#form-item-icon-show').html('<i class="fas '+$(this).val()+'"></i>');
+        $('#form-item-icon-show').html('<i class="fas ' + $(this).val() + '"></i>');
     });
 
     // Manage the password show button
     // including autohide after a couple of seconds
     let isPasswordVisible = false;
     let passwordTimeout = null;
-    $(document).on('click', '#card-item-pwd-toggle-button', function () {
+    $(document).on('click', '#card-item-pwd-toggle-button', function() {
         const $icon = $('.pwd-toggle-icon');
         const $button = $(this);
         const $pwdField = $('#card-item-pwd');
@@ -590,7 +646,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
         // Auto-close after delay
         if (timeOut > 0) {
-            setTimeout(function () {
+            setTimeout(function() {
                 toastr.clear($toast)
             }, timeOut)
         }
@@ -606,11 +662,11 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         // Prevent usage of items actions when local storage and DOM are out
         // of sync. Let the user create a new item or refresh data even if the
         // IDs don't match.
-        if ($(this).data('folder-action') === undefined
-            && $(this).data('item-action') !== undefined
-            && $(this).data('item-action') !== 'new'
-            && $(this).data('item-action') !== 'reload' 
-            && item_dom_id !== item_storage_id) {
+        if ($(this).data('folder-action') === undefined &&
+            $(this).data('item-action') !== undefined &&
+            $(this).data('item-action') !== 'new' &&
+            $(this).data('item-action') !== 'reload' &&
+            item_dom_id !== item_storage_id) {
 
             // Display error and stop
             toastr.remove();
@@ -803,7 +859,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             $('.form-folder-delete').removeClass('hidden');
 
             // Prepare some data in the form
-            console.log("> "+store.get('teampassApplication').selectedFolder);
+            console.log("> " + store.get('teampassApplication').selectedFolder);
             $('#form-folder-delete-selection').val(store.get('teampassApplication').selectedFolder).change();
             $('#form-folder-confirm-delete').iCheck('uncheck');
 
@@ -861,7 +917,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     'teampassItem',
                     function(teampassItem) {
                         teampassItem.isNewItem = 1,
-                        teampassItem.id = ''
+                            teampassItem.id = ''
                     }
                 );
 
@@ -941,7 +997,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     todayBtn: true,
                     language: '<?php echo $session->get('user-language_code') ?? 'en'; ?>'
                 });
-                
+
                 // Add track-change class
                 //$('#form-item-label, #form-item-description, #form-item-login, #form-item-password, #form-item-email, #form-item-url, #form-item-folder, #form-item-restrictedto, #form-item-tags, #form-item-anyoneCanModify, #form-item-deleteAfterShown, #form-item-deleteAfterDate, #form-item-anounce, .form-item-field-custom').addClass('track-change');
 
@@ -964,7 +1020,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     teampassItem.otp_code_generate = false;
                 }
             );
-            
+
 
             // if item is ready
             if (store.get('teampassItem').readyToUse === false) {
@@ -1035,9 +1091,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
                 // Now manage edition using the folder resolved by backend.
                 showItemEditForm(
-                    retData.folderId !== undefined && retData.folderId !== ''
-                        ? parseInt(retData.folderId, 10)
-                        : item_tree_id,
+                    retData.folderId !== undefined && retData.folderId !== '' ?
+                    parseInt(retData.folderId, 10) :
+                    item_tree_id,
                     _prefetchedPassword
                 );
             });
@@ -1060,7 +1116,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 );
                 return false;
             }
-            
+
             // Store current view
             savePreviousView('.form-item-copy');
 
@@ -1195,10 +1251,12 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             //
             // > END <
             //
-        } else if ($(this).data('item-action') === 'reload') {            
+        } else if ($(this).data('item-action') === 'reload') {
             if (debugJavascript === true) console.info('RELOAD ITEM');
             toastr.remove();
-            loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
+            loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', {
+                timeOut: 0
+            });
 
             $.when(
                 Details(store.get('teampassItem').id, 'show', true)
@@ -1240,7 +1298,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             //
         } else if ($(this).data('item-action') === 'link') {
             // Add link to clipboard.
-            navigator.clipboard.writeText("<?php echo $SETTINGS['cpassman_url'];?>/index.php?page=items&group="+store.get('teampassItem').folderId+"&id="+store.get('teampassItem').id);
+            navigator.clipboard.writeText("<?php echo $SETTINGS['cpassman_url']; ?>/index.php?page=items&group=" + store.get('teampassItem').folderId + "&id=" + store.get('teampassItem').id);
 
             // Display message.
             toastr.remove();
@@ -1262,17 +1320,17 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
             // Reset the checkbox
             $('#items-selection-checkbox').iCheck('uncheck');
-            
+
             if (!checkboxesExist) {
                 // Ajouter les cases à cocher
                 $('.list-item-description .icon-container').each(function() {
                     var $container = $(this);
                     var $row = $container.closest('tr');
                     var itemId = $row.data('item-id');
-                    
+
                     // Créer la case à cocher
                     var checkbox = '<input type="checkbox" class="item-checkbox mr-2" data-item-id="' + itemId + '" value="' + itemId + '">';
-                    
+
                     // Insérer la case à cocher au début du conteneur
                     $container.prepend(checkbox);
                 });
@@ -1301,20 +1359,23 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 return selectedIds;
             }
 
-            
+
             $("#items-delete-user-confirm").modal('show');
 
             // Handle delete task
             $("#modal-btn-items-delete-launch").on("click", function() {
                 toastr.remove();
-                loadingToast = toastr.info('<?php echo $lang->get('in_progress'); ?> ... <i class="fas fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
-                
+                loadingToast = toastr.info('<?php echo $lang->get('in_progress'); ?> ... <i class="fas fa-circle-notch fa-spin fa-2x"></i>', '', {
+                    timeOut: 0
+                });
+
                 var selectedItemIds = getSelectedItemIds();
 
                 if (selectedItemIds.length === 0) {
                     toastrUpdate(loadingToast, 'error',
-                        '<?php echo $lang->get('no_item_selected'); ?>',
-                        { timeOut: 5000 }
+                        '<?php echo $lang->get('no_item_selected'); ?>', {
+                            timeOut: 5000
+                        }
                     );
                     $("#items-delete-user-confirm").modal('hide');
                     return false;
@@ -1323,7 +1384,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 var data = {
                     'selectedItemIds': JSON.stringify(selectedItemIds),
                 }
-                
+
                 $.post(
                     "sources/items.queries.php", {
                         type: "items_delete",
@@ -1337,16 +1398,18 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
                         if (data.error === true) {
                             toastrUpdate(loadingToast, 'error',
-                                data.message,
-                                { timeOut: 5000 }
+                                data.message, {
+                                    timeOut: 5000
+                                }
                             );
                             return false;
                         }
 
                         // Inform user
                         toastrUpdate(loadingToast, 'success',
-                            '<?php echo $lang->get('message'); ?>',
-                            { timeOut: 3000 }
+                            '<?php echo $lang->get('message'); ?>', {
+                                timeOut: 3000
+                            }
                         );
 
                         // Reset the checkbox
@@ -1354,7 +1417,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
                         // Force refresh of the tree
                         internalRefreshVisibleFolders(true)
-                        
+
                         // Reload items list
                         ListerItems(
                             store.get('teampassItem').folderId,
@@ -1367,7 +1430,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 );
             });
 
-            $("#modal-btn-items-delete-cancel").on("click", function(){
+            $("#modal-btn-items-delete-cancel").on("click", function() {
                 $("#items-delete-user-confirm").modal('hide');
             });
 
@@ -1404,14 +1467,14 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         return false;
     });
 
-    
+
     // Gestionnaire pour la case "Sélectionner tout"
     $('#items-selection-checkbox').on('change', function() {
         var isChecked = $(this).prop('checked');
-        
+
         // Cocher/décocher toutes les cases à cocher des éléments
         $('.item-checkbox').prop('checked', isChecked);
-        
+
         // Optionnel : Ajouter une classe visuelle aux lignes sélectionnées
         if (isChecked) {
             $('.item-checkbox').closest('tr').addClass('selected-row');
@@ -1432,8 +1495,10 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         } else if ($('.item-details-card-menu').hasClass('hidden') === false) {
             element = '.item-details-card';
         }
-        
-        if (debugJavascript === true) {console.log('>>> ' + element + ' -- ' + newElement);}
+
+        if (debugJavascript === true) {
+            console.log('>>> ' + element + ' -- ' + newElement);
+        }
 
         if (element === '.item-details-card') element = '#folders-tree-card';
 
@@ -1660,7 +1725,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         if (folderId === null || folderId === '' || typeof folderId === 'undefined') {
             $('#card-item-visibility').html('<i class="fa-solid fa-ellipsis mr-2 fa-fade"></i>');
             $('#card-item-minimum-complexity').html('<i class="fa-solid fa-ellipsis mr-2 fa-fade"></i>');
-            return $.Deferred().resolve({ error: true }).promise();
+            return $.Deferred().resolve({
+                error: true
+            }).promise();
         }
 
         itemFolderRulesRefreshRequestId += 1;
@@ -1674,9 +1741,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 type: 'get_complixity_level',
                 folder_id: folderId,
                 context: context,
-                item_id: store.get('teampassItem') !== undefined && store.get('teampassItem').id !== undefined
-                    ? store.get('teampassItem').id
-                    : '',
+                item_id: store.get('teampassItem') !== undefined && store.get('teampassItem').id !== undefined ?
+                    store.get('teampassItem').id :
+                    '',
                 key: '<?php echo $session->get('key'); ?>'
             }
         ).then(function(data) {
@@ -1700,11 +1767,11 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     'teampassItem',
                     function(teampassItem) {
                         teampassItem.folderId = data.folderId === undefined ? parseInt(folderId, 10) : parseInt(data.folderId, 10),
-                        teampassItem.tree_id = data.folderId === undefined ? teampassItem.tree_id : parseInt(data.folderId, 10),
-                        teampassItem.folderComplexity = data.val === undefined ? '' : parseInt(data.val, 10),
-                        teampassItem.folderIsPersonal = data.personal === undefined ? '' : parseInt(data.personal, 10),
-                        teampassItem.itemMinimumComplexity = data.complexity === undefined ? '' : data.complexity,
-                        teampassItem.itemVisibility = data.visibility === undefined ? '' : data.visibility
+                            teampassItem.tree_id = data.folderId === undefined ? teampassItem.tree_id : parseInt(data.folderId, 10),
+                            teampassItem.folderComplexity = data.val === undefined ? '' : parseInt(data.val, 10),
+                            teampassItem.folderIsPersonal = data.personal === undefined ? '' : parseInt(data.personal, 10),
+                            teampassItem.itemMinimumComplexity = data.complexity === undefined ? '' : data.complexity,
+                            teampassItem.itemVisibility = data.visibility === undefined ? '' : data.visibility
                     }
                 );
 
@@ -1805,7 +1872,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
         // Show cog
         loadingToast = toastr
-            .info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
+            .info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', {
+                timeOut: 0
+            });
 
         // Prepare data
         var data = {
@@ -1827,8 +1896,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 if (data.error !== false) {
                     // Show error
                     toastrUpdate(loadingToast, 'error',
-                        data.message,
-                        { timeOut: 5000 }
+                        data.message, {
+                            timeOut: 5000
+                        }
                     );
                 } else {
                     $('#folders-tree-card').removeClass('hidden');
@@ -1836,8 +1906,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
                     // Inform user
                     toastrUpdate(loadingToast, 'info',
-                        '<?php echo $lang->get('done'); ?>',
-                        { timeOut: 1000 }
+                        '<?php echo $lang->get('done'); ?>', {
+                            timeOut: 1000
+                        }
                     );
 
                     // Clear
@@ -1861,11 +1932,12 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         );
     });
 
-    function goDeleteItem(itemId, itemKey, folderId, hasAccessLevel, closeItemCard = true)
-    {
+    function goDeleteItem(itemId, itemKey, folderId, hasAccessLevel, closeItemCard = true) {
         // Show cog
         loadingToast = toastr
-            .info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
+            .info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', {
+                timeOut: 0
+            });
 
         // Force user did a change to false
         userDidAChange = false;
@@ -1910,8 +1982,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     $('.form-item-action, .item-details-card-menu').addClass('hidden');
                     // Warn user
                     toastrUpdate(loadingToast, 'success',
-                        '<?php echo $lang->get('success'); ?>',
-                        { timeOut: 1000 }
+                        '<?php echo $lang->get('success'); ?>', {
+                            timeOut: 1000
+                        }
                     );
                     // Refresh tree and let the selected folder reload the items list only once
                     startedItemsListQuery = false;
@@ -1924,8 +1997,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 } else {
                     // ERROR
                     toastrUpdate(loadingToast, 'error',
-                        data.message,
-                        { timeOut: 5000 }
+                        data.message, {
+                            timeOut: 5000
+                        }
                     );
                 }
             }
@@ -1995,7 +2069,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
         // Show cog
         toastr.remove();
-        loadingToast = toastr.info('<?php echo $lang->get('item_copying'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
+        loadingToast = toastr.info('<?php echo $lang->get('item_copying'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', {
+            timeOut: 0
+        });
 
         // Force user did a change to false
         userDidAChange = false;
@@ -2007,7 +2083,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             'dest_id': $('#form-item-copy-destination').val(),
             'new_label': DOMPurify.sanitize($('#form-item-copy-new-label').val()),
         }
-        
+
         console.log("COPY ITEM data:");
         console.log(data);
 
@@ -2025,8 +2101,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 if (typeof data !== 'undefined' && data.error !== true) {
                     // Warn user
                     toastrUpdate(loadingToast, 'success',
-                        '<?php echo $lang->get('success'); ?>',
-                        { timeOut: 1000 }
+                        '<?php echo $lang->get('success'); ?>', {
+                            timeOut: 1000
+                        }
                     );
 
                     // Select folder of new item in jstree
@@ -2051,8 +2128,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 } else {
                     // ERROR
                     toastrUpdate(loadingToast, 'error',
-                        data.message,
-                        { timeOut: 5000 }
+                        data.message, {
+                            timeOut: 5000
+                        }
                     );
                 }
             }
@@ -2086,7 +2164,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             toastr.remove();
             loadingToast = toastr.info(
                 '<i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>',
-                '', { timeOut: 0 }
+                '', {
+                    timeOut: 0
+                }
             );
 
             // Force user did a change to false
@@ -2114,14 +2194,16 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     //check if format error
                     if (data.error === true) {
                         toastrUpdate(loadingToast, 'error',
-                            data.message,
-                            { timeOut: 5000 }
+                            data.message, {
+                                timeOut: 5000
+                            }
                         );
                     } else {
                         // Warn user
                         toastrUpdate(loadingToast, 'success',
-                            '<?php echo $lang->get('success'); ?>',
-                            { timeOut: 1000 }
+                            '<?php echo $lang->get('success'); ?>', {
+                                timeOut: 1000
+                            }
                         );
 
                         // Info
@@ -2142,14 +2224,16 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 function(data) {
                     if (data[0].error != "") {
                         toastrUpdate(loadingToast, 'error',
-                            data[0].error,
-                            { timeOut: 5000 }
+                            data[0].error, {
+                                timeOut: 5000
+                            }
                         );
                     } else {
                         $('#form-item-server-cron-frequency').val(0).change();
                         toastrUpdate(loadingToast, 'success',
-                            '<?php echo $lang->get('success'); ?>',
-                            { timeOut: 1000 }
+                            '<?php echo $lang->get('success'); ?>', {
+                                timeOut: 1000
+                            }
                         );
                     }
                 },
@@ -2183,7 +2267,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
         // Show cog
         loadingToast = toastr
-            .info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
+            .info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', {
+                timeOut: 0
+            });
 
         // Force user did a change to false
         userDidAChange = false;
@@ -2196,8 +2282,16 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             'password': $('#form-item-suggestion-password').val(),
             'email': DOMPurify.sanitize($('#form-item-suggestion-email').val()),
             'url': DOMPurify.sanitize($('#form-item-suggestion-url').val()),
-            'description': DOMPurify.sanitize($('#form-item-suggestion-description').summernote('code'), {USE_PROFILES: {html: true}}),
-            'comment': DOMPurify.sanitize($('#form-item-suggestion-comment').val(), {USE_PROFILES: {html: true}}),
+            'description': DOMPurify.sanitize($('#form-item-suggestion-description').summernote('code'), {
+                USE_PROFILES: {
+                    html: true
+                }
+            }),
+            'comment': DOMPurify.sanitize($('#form-item-suggestion-comment').val(), {
+                USE_PROFILES: {
+                    html: true
+                }
+            }),
             'folder_id': selectedFolderId,
             'item_id': store.get('teampassItem').id
         }
@@ -2216,14 +2310,16 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 if (data.error === true) {
                     // ERROR
                     toastrUpdate(loadingToast, 'error',
-                        data.message,
-                        { timeOut: 5000 }
+                        data.message, {
+                            timeOut: 5000
+                        }
                     );
                 } else {
                     // Warn user
                     toastrUpdate(loadingToast, 'success',
-                        '<?php echo $lang->get('success'); ?>',
-                        { timeOut: 1000 }
+                        '<?php echo $lang->get('success'); ?>', {
+                            timeOut: 1000
+                        }
                     );
                     // Clear form
                     $('.form-item-suggestion').html('');
@@ -2278,7 +2374,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
         // Show cog
         loadingToast = toastr
-            .info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
+            .info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', {
+                timeOut: 0
+            });
 
         // Force user did a change to false
         userDidAChange = false;
@@ -2291,8 +2389,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         if (formLabel === false || formIcon === false || formIconSelected === false) {
             // Label is empty
             toastrUpdate(loadingToast, 'warning',
-                'XSS attempt detected. Field has been emptied.',
-                { timeOut: 5000 }
+                'XSS attempt detected. Field has been emptied.', {
+                    timeOut: 5000
+                }
             );
             return false;
         }
@@ -2324,8 +2423,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 if (data.error === true) {
                     // ERROR
                     toastrUpdate(loadingToast, 'error',
-                        data.message,
-                        { timeOut: 5000 }
+                        data.message, {
+                            timeOut: 5000
+                        }
                     );
                 } else {
                     if ($('#form-folder-add').data('action') === 'add') {
@@ -2343,8 +2443,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     closeItemDetailsCard();
                     // Warn user
                     toastrUpdate(loadingToast, 'success',
-                        '<?php echo $lang->get('success'); ?>',
-                        { timeOut: 1000 }
+                        '<?php echo $lang->get('success'); ?>', {
+                            timeOut: 1000
+                        }
                     );
                 }
                 // Enable the parent in select
@@ -2366,8 +2467,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             toastr.remove();
             toastr.error(
                 '<?php echo $lang->get('please_confirm'); ?>',
-                '',
-                {
+                '', {
                     timeOut: 5000,
                     progressBar: true
                 }
@@ -2377,8 +2477,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             toastr.remove();
             toastr.error(
                 '<?php echo $lang->get('error_not_allowed_to'); ?>',
-                '',
-                {
+                '', {
                     timeOut: 5000,
                     progressBar: true
                 }
@@ -2391,31 +2490,31 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             toastr.remove();
             toastr.error(
                 '<?php echo $lang->get('please_select_a_folder'); ?>',
-                '',
-                {
+                '', {
                     timeOut: 5000,
                     progressBar: true
                 }
             );
             return false;
-        
-        // Ensure Root is not selected
+
+            // Ensure Root is not selected
         } else if (parseInt($('#form-folder-delete-selection option:selected').val()) === 0 || $('#form-folder-delete-selection option:selected').length === 0) {
             toastr.remove();
             toastr.error(
                 '<?php echo $lang->get('please_select_a_folder'); ?>',
-                '',
-                {
+                '', {
                     timeOut: 5000,
                     progressBar: true
                 }
             );
             return false;
         }
-        
+
         // Show cog
         loadingToast = toastr
-            .info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
+            .info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', {
+                timeOut: 0
+            });
 
 
         var selectedFolders = [],
@@ -2440,8 +2539,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 if (data.error === true) {
                     // ERROR
                     toastrUpdate(loadingToast, 'error',
-                        data.message,
-                        { timeOut: 5000 }
+                        data.message, {
+                            timeOut: 5000
+                        }
                     );
                 } else {
                     // Refresh visible folders/session rights, then rebuild and reselect the parent folder
@@ -2452,8 +2552,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     closeItemDetailsCard();
                     // Warn user
                     toastrUpdate(loadingToast, 'success',
-                        '<?php echo $lang->get('success'); ?>',
-                        { timeOut: 1000 }
+                        '<?php echo $lang->get('success'); ?>', {
+                            timeOut: 1000
+                        }
                     );
                 }
 
@@ -2493,13 +2594,19 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         // Show cog
         toastr.remove();
         loadingToast = toastr
-            .info('<?php echo $lang->get('please_wait_folders_in_construction'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
-        
+            .info('<?php echo $lang->get('please_wait_folders_in_construction'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', {
+                timeOut: 0
+            });
+
         // Launch action
         var data = {
             'source_folder_id': $('#form-folder-copy-source option:selected').val(),
             'target_folder_id': $('#form-folder-copy-destination option:selected').val(),
-            'folder_label': DOMPurify.sanitize($('#form-folder-copy-label').val(), {USE_PROFILES: {html: false}}),
+            'folder_label': DOMPurify.sanitize($('#form-folder-copy-label').val(), {
+                USE_PROFILES: {
+                    html: false
+                }
+            }),
             'copy_subdirectories': $('#form-folder-copy-sub-directories').is(':checked') === true ? 1 : 0,
             'copy_items': $('#form-folder-copy-items').is(':checked') === true ? 1 : 0,
         }
@@ -2516,8 +2623,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 if (data.error === true) {
                     // ERROR
                     toastrUpdate(loadingToast, 'error',
-                        data.message,
-                        { timeOut: 5000 }
+                        data.message, {
+                            timeOut: 5000
+                        }
                     );
                 } else {
                     // Refresh visible folders/session rights, then rebuild and reselect the destination folder
@@ -2541,13 +2649,15 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                         });
                         itemList += '</ul>';
                         toastrUpdate(loadingToast, 'warning',
-                            '<?php echo $lang->get('some_items_not_copied_empty_password'); ?>:<br>' + itemList,
-                            { timeOut: 0 }
+                            '<?php echo $lang->get('some_items_not_copied_empty_password'); ?>:<br>' + itemList, {
+                                timeOut: 0
+                            }
                         );
                     } else {
                         toastrUpdate(loadingToast, 'success',
-                            '<?php echo $lang->get('success'); ?>',
-                            { timeOut: 4000 }
+                            '<?php echo $lang->get('success'); ?>', {
+                                timeOut: 4000
+                            }
                         );
                     }
                 }
@@ -2678,7 +2788,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 // Restore scroll position
                 $(window).scrollTop(userScrollPosition);
 
-                userDidAChange = false;                
+                userDidAChange = false;
                 //$('.form-item-control').attr('data-change-ongoing', "");
 
                 // Enable the parent in select
@@ -2722,7 +2832,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
     $(document)
         .on('click', '.but-navigate-item', function() {
             toastr.remove();
-            loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
+            loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', {
+                timeOut: 0
+            });
 
             if (clipboardOTPCode) {
                 clipboardOTPCode.destroy();
@@ -2748,7 +2860,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
     $(document)
         .on('click', '.list-item-clicktoshow', function() {
             toastr.remove();
-            loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
+            loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', {
+                timeOut: 0
+            });
 
             // show top back buttons
             $('#but_back_top_left, #but_back_top_right').removeClass('hidden');
@@ -2758,7 +2872,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         })
         .on('click', '.list-item-clicktoedit', function() {
             toastr.remove();
-            loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
+            loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', {
+                timeOut: 0
+            });
 
             if (debugJavascript === true) console.log('EDIT ME');
             // Set type of action
@@ -2766,7 +2882,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
             // Hide top back buttons
             $('#but_back_top_left, #but_back_top_right').addClass('hidden');
-            
+
             // Load item info
             Details($(this).closest('tr'), 'edit');
         })
@@ -2774,7 +2890,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             event.preventDefault();
             // Delete item
             if (debugJavascript === true) {
-                console.info('SHOW DELETE ITEM '+$(this).data('item-id'));
+                console.info('SHOW DELETE ITEM ' + $(this).data('item-id'));
             }
             startedItemsListQuery = false;
 
@@ -2812,11 +2928,13 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     false,
                     false
                 );
-                
+
                 // Launch deletion
                 $(document)
                     .off('click.tpDeleteItemConfirm', '#warningModalButtonAction')
-                    .one('click.tpDeleteItemConfirm', '#warningModalButtonAction', {itemKey:$(this).data('item-key')}, function(event2) {
+                    .one('click.tpDeleteItemConfirm', '#warningModalButtonAction', {
+                        itemKey: $(this).data('item-key')
+                    }, function(event2) {
                         event2.preventDefault();
 
                         goDeleteItem(
@@ -2923,7 +3041,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                         } else {
                             $(elem)
                                 .html('<span class="fa-stack fa-clickable item-favourite pointer infotip mr-2" title="<?php echo $lang->get('favorite'); ?>" data-item-id="' + data.item_id + '" data-item-favourited="0"><i class="fa-solid fa-circle fa-stack-2x"></i><i class="fa-solid fa-star fa-stack-1x fa-inverse"></i></span>');
-                            
+
                             // Add highlighting
                             if (store.get('teampassApplication').highlightFavorites === 1) {
                                 $('#list-item-row_' + data.item_id).removeClass('bg-yellow');
@@ -2978,15 +3096,15 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         });
 
     const showPwdContinuous = function() {
-        if (mouseStillDown === true 
-            && !$('#card-item-pwd').hasClass('pwd-shown')
+        if (mouseStillDown === true &&
+            !$('#card-item-pwd').hasClass('pwd-shown')
         ) {
             getItemPassword(
                 'at_password_shown',
                 'item_id',
                 store.get('teampassItem').id
             ).then(item_pwd => {
-                if (item_pwd) {                    
+                if (item_pwd) {
                     $('#card-item-pwd').text(item_pwd);
                     $('#card-item-pwd').addClass('pwd-shown');
 
@@ -2994,8 +3112,8 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     setTimeout('showPwdContinuous("card-item-pwd")', 50);
                 }
             });
-            
-        } else if(mouseStillDown !== true) {
+
+        } else if (mouseStillDown !== true) {
             $('#card-item-pwd')
                 .html('<?php echo $var['hidden_asterisk']; ?>')
                 .removeClass('pwd-shown');
@@ -3068,7 +3186,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             zxcvbn: true,
             debug: false,
             minChar: 4,
-            onScore: function (options, word, totalScoreCalculated) {
+            onScore: function(options, word, totalScoreCalculated) {
                 if (word.length === 20 && totalScoreCalculated < options.ui.scores[1]) {
                     // Score doesn't meet the score[1]. So we will return the min
                     // numbers of points to get that score instead.
@@ -3091,10 +3209,10 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 progress: "#form-item-password-strength",
                 score: "#form-item-password-strength"
             },
-            scores: [<?php echo TP_PW_STRENGTH_1;?>, <?php echo TP_PW_STRENGTH_2;?>, <?php echo TP_PW_STRENGTH_3;?>, <?php echo TP_PW_STRENGTH_4;?>, <?php echo TP_PW_STRENGTH_5;?>],
+            scores: [<?php echo TP_PW_STRENGTH_1; ?>, <?php echo TP_PW_STRENGTH_2; ?>, <?php echo TP_PW_STRENGTH_3; ?>, <?php echo TP_PW_STRENGTH_4; ?>, <?php echo TP_PW_STRENGTH_5; ?>],
         },
-        i18n : {
-            t: function (key) {
+        i18n: {
+            t: function(key) {
                 var phrases = {
                     weak: '<?php echo $lang->get('complex_level1'); ?>',
                     normal: '<?php echo $lang->get('complex_level2'); ?>',
@@ -3235,10 +3353,12 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         init: {
             BeforeUpload: function(up, file) {
                 fileId = file.id;
-                toastr.remove();         
-                loadingToast = toastrElement = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <span id="plupload-progress" class="mr-2 ml-2 strong">0%</span><i class="fas fa-cloud-arrow-up fa-bounce fa-2x"></i>', '', { timeOut: 0 });
+                toastr.remove();
+                loadingToast = toastrElement = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <span id="plupload-progress" class="mr-2 ml-2 strong">0%</span><i class="fas fa-cloud-arrow-up fa-bounce fa-2x"></i>', '', {
+                    timeOut: 0
+                });
                 // Show file name
-                $('#upload-file_' + file.id).html('<i class="fa-solid fa-file fa-sm mr-2"></i>' + htmlEncode(file.name) + '<span id="fileStatus_'+file.id+'"><i class="fa-solid fa-circle-notch fa-spin  ml-2"></i></span>');
+                $('#upload-file_' + file.id).html('<i class="fa-solid fa-file fa-sm mr-2"></i>' + htmlEncode(file.name) + '<span id="fileStatus_' + file.id + '"><i class="fa-solid fa-circle-notch fa-spin  ml-2"></i></span>');
 
                 // Get random number
                 if (store.get('teampassApplication').uploadedFileId === '') {
@@ -3279,7 +3399,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
     });
 
     uploader_attachments.bind('FileUploaded', function(up, file) {
-        $('#fileStatus_'+file.id).html('<i class="fa-solid fa-circle-check text-success ml-2 fa-1x"></i>');
+        $('#fileStatus_' + file.id).html('<i class="fa-solid fa-circle-check text-success ml-2 fa-1x"></i>');
         userUploadedFile = true;
         userDidAChange = true;
         toastr.remove();
@@ -3314,7 +3434,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 }
             );
 
-            $('#fileStatus_'+fileId).html('<i class="fa-solid fa-circle-xmark text-danger ml-2 fa-1x"></i>');
+            $('#fileStatus_' + fileId).html('<i class="fa-solid fa-circle-xmark text-danger ml-2 fa-1x"></i>');
             return false;
         } else {
             up.refresh(); // Reposition Flash/Silverlight
@@ -3446,8 +3566,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         toastr.remove();
         loadingToast = toastr.info(
             '<i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>',
-            '<?php echo $lang->get('please_wait'); ?>',
-            { timeOut: 0 }
+            '<?php echo $lang->get('please_wait'); ?>', {
+                timeOut: 0
+            }
         );
 
         // Loop on all changed fields
@@ -3462,7 +3583,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             }
         });
         if (debugJavascript === true) {
-            console.log('CHANGED FIELDS '+userUploadedFile + ' ' + userDidAChange);
+            console.log('CHANGED FIELDS ' + userUploadedFile + ' ' + userDidAChange);
             console.log(arrayQuery);
         }
 
@@ -3474,7 +3595,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             userItemRight = itemsList[store.get('teampassItem').id]?.rights;
         }
 
-        
+
 
         // Do checks
         if (arrayQuery.length > 0 || userDidAChange === true) {
@@ -3486,7 +3607,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 // if purify failed, stop
                 return false;
             }
-            
+
             // Do some easy checks
             if (purifyRes.arrFields['label'] === '') {
                 // Label is empty
@@ -3499,8 +3620,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     }
                 );
                 return false;
-            } else if (purifyRes.arrFields['tags'] !== '' && reg.test(purifyRes.arrFields['tags'])
-            ) {
+            } else if (purifyRes.arrFields['tags'] !== '' && reg.test(purifyRes.arrFields['tags'])) {
                 // Tags not wel formated
                 toastr.remove();
                 toastr.error(
@@ -3669,7 +3789,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 $.post(
                     "sources/items.queries.php", {
                         type: $('#form-item-button-save').data('action'),
-                        data: prepareExchangedData(JSON.stringify(data), "encode", "<?php echo $session->get('key'); ?>", '', '', false),   // don't purify, already done
+                        data: prepareExchangedData(JSON.stringify(data), "encode", "<?php echo $session->get('key'); ?>", '', '', false), // don't purify, already done
                         key: "<?php echo $session->get('key'); ?>"
                     },
                     function(data) {
@@ -3684,8 +3804,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                             $("#div_dialog_message").dialog("open");
 
                             toastrUpdate(loadingToast, 'error',
-                                'An error appears. Answer from Server cannot be parsed!<br />Returned data:<br />' + data,
-                                { timeOut: 5000 }
+                                'An error appears. Answer from Server cannot be parsed!<br />Returned data:<br />' + data, {
+                                    timeOut: 5000
+                                }
                             );
                             return false;
                         }
@@ -3695,8 +3816,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                         }
                         if (data.error === true) {
                             toastrUpdate(loadingToast, 'error',
-                                data.message,
-                                { timeOut: 5000 }
+                                data.message, {
+                                    timeOut: 5000
+                                }
                             );
                             return false;
                         } else {
@@ -3733,7 +3855,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                                 // Select folder of item in jstree
                                 $('#jstree').jstree('deselect_all');
                                 $('#jstree').jstree('select_node', '#li_' + $('#form-item-folder').val());
-                                
+
                                 // Refresh list of items (single call, not duplicated by jstree handler)
                                 ListerItems($('#form-item-folder').val(), '', 0);
 
@@ -3755,16 +3877,18 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                                     .addClass('col-md-12')
                                     .prepend(
                                         '<div class="delete-after-usage d-flex justify-content-center align-items-center" style="min-height:300px;">' +
-                                            '<div class="text-center text-muted">' +
-                                                '<i class="fa-solid fa-circle-notch fa-spin fa-3x mb-3"></i>' +
-                                                '<p><?php echo $lang->get('loading_item'); ?></p>' +
-                                            '</div>' +
+                                        '<div class="text-center text-muted">' +
+                                        '<i class="fa-solid fa-circle-notch fa-spin fa-3x mb-3"></i>' +
+                                        '<p><?php echo $lang->get('loading_item'); ?></p>' +
+                                        '</div>' +
                                         '</div>'
                                     );
 
                                 // Show loading toast
                                 toastr.clear(loadingToast);
-                                loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
+                                loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', {
+                                    timeOut: 0
+                                });
 
                                 // Reload item details
                                 // When an encryption task exists, prefer the WebSocket refresh path
@@ -3829,16 +3953,18 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                                     .addClass('col-md-12')
                                     .prepend(
                                         '<div class="delete-after-usage d-flex justify-content-center align-items-center" style="min-height:300px;">' +
-                                            '<div class="text-center text-muted">' +
-                                                '<i class="fa-solid fa-circle-notch fa-spin fa-3x mb-3"></i>' +
-                                                '<p><?php echo $lang->get('loading_item'); ?></p>' +
-                                            '</div>' +
+                                        '<div class="text-center text-muted">' +
+                                        '<i class="fa-solid fa-circle-notch fa-spin fa-3x mb-3"></i>' +
+                                        '<p><?php echo $lang->get('loading_item'); ?></p>' +
+                                        '</div>' +
                                         '</div>'
                                     );
 
                                 // Show loading toast
                                 toastr.clear(loadingToast);
-                                loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
+                                loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', {
+                                    timeOut: 0
+                                });
 
                                 // Load item details
                                 // When an encryption task exists, prefer the WebSocket refresh path
@@ -3855,8 +3981,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
                             // Inform user
                             toastrUpdate(loadingToast, 'success',
-                                '<?php echo $lang->get('success'); ?>',
-                                { timeOut: 1000 }
+                                '<?php echo $lang->get('success'); ?>', {
+                                    timeOut: 1000
+                                }
                             );
 
                             // Close
@@ -3866,7 +3993,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                             // Close edit form and reopen folders-tree-card with refreshed item.
                             $('.form-item, #form-item-attachments-zone').addClass('hidden');
                             $('#folders-tree-card').removeClass('hidden');
-                            item_id = store.get('teampassItem').id !== '' ? store.get('teampassItem').id : data.item_id;                         
+                            item_id = store.get('teampassItem').id !== '' ? store.get('teampassItem').id : data.item_id;
                             Details(item_id, 'show', true);
                         }
                     }
@@ -3983,9 +4110,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         $('#form-item-password-complex').val(0);
         $('#form-item-password').pwstrength('forceUpdate');
 
-        const _pwdPromise = prefetchedPasswordPromise !== null
-            ? prefetchedPasswordPromise
-            : getItemPassword('at_password_shown_edit_form', 'item_id', itemId);
+        const _pwdPromise = prefetchedPasswordPromise !== null ?
+            prefetchedPasswordPromise :
+            getItemPassword('at_password_shown_edit_form', 'item_id', itemId);
 
         // setTimeout(0) ensures the browser repaints the loading state before the
         // strength bar is updated (microtasks from Promise.resolve run before repaint).
@@ -4070,9 +4197,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
             // Show loading state in password field and apply password asynchronously.
             // Pass the pre-fetched promise when available (parallel fetch), or null to start fresh.
-            const _prefetchedPromise = (prefetchedPassword !== undefined && prefetchedPassword !== null)
-                ? Promise.resolve(prefetchedPassword)
-                : null;
+            const _prefetchedPromise = (prefetchedPassword !== undefined && prefetchedPassword !== null) ?
+                Promise.resolve(prefetchedPassword) :
+                null;
             loadPasswordIntoEditForm(_prefetchedPromise, store.get('teampassItem').id);
         }
         //});
@@ -4193,11 +4320,15 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
      */
     function internalRefreshVisibleFolders(forceRefreshCache = false, onDone = null) {
         var foldersVersion = ''
-        try { foldersVersion = localStorage.getItem('tp_folders_version') || '' } catch(e) {}
+        try {
+            foldersVersion = localStorage.getItem('tp_folders_version') || ''
+        } catch (e) {}
         // Clear version on force refresh
         if (forceRefreshCache === true) {
             foldersVersion = ''
-            try { localStorage.removeItem('tp_folders_version') } catch(e) {}
+            try {
+                localStorage.removeItem('tp_folders_version')
+            } catch (e) {}
         }
 
         var data = {
@@ -4229,7 +4360,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                         console.log('Folders unchanged, using cached data');
                     }
                     // Store version
-                    try { localStorage.setItem('tp_folders_version', data.folders_version || '') } catch(e) {}
+                    try {
+                        localStorage.setItem('tp_folders_version', data.folders_version || '')
+                    } catch (e) {}
                     // foldersList is already in the store — still trigger subfolder display
                     // in case ListerItems() was called before this AJAX completed.
                     if (store.get('teampassUser').show_subfolders === 1) {
@@ -4308,7 +4441,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                             if (data.folders_version) {
                                 localStorage.setItem('tp_folders_version', data.folders_version)
                             }
-                        } catch(e) {}
+                        } catch (e) {}
 
                         // remove ROOT option if exists
                         $('#form-item-copy-destination option[value="0"]').remove();
@@ -4344,14 +4477,14 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
     function displaySubfolders(folders, parentId) {
         // Manage case where no folders
         if (folders === '' || folders === undefined) {
-            $('#teampass_subfolders_list').html('<tr><td colspan="2" class="text-center text-muted"><?php echo $lang->get('no_folder_selected');?></td></tr>');
+            $('#teampass_subfolders_list').html('<tr><td colspan="2" class="text-center text-muted"><?php echo $lang->get('no_folder_selected'); ?></td></tr>');
             return false;
         }
-        
+
         // Use requestAnimationFrame to avoid blocking UI
         requestAnimationFrame(() => {
             const directChildren = folders.filter(folder => folder.parent_id === parentId);
-            
+
             // Build all HTML at once (better performance)
             const html = directChildren.map(folder => `
                 <tr data-tree-id="${folder.id}" class="pointer open-folder">
@@ -4361,7 +4494,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     </td>
                 </tr>
             `).join('');
-            
+
             // Inject all at once (single reflow)
             $('#teampass_subfolders_list').html(html);
         });
@@ -4377,7 +4510,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             sending = '';
 
         if (null === folders) return false;
-        
+
         if (action === 'clear') {
             let foldersArray = Array.isArray(folders) ? folders : [folders];
             sending = JSON.stringify(foldersArray.map(a => parseInt(a.id)));
@@ -4388,7 +4521,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             console.info('INPUTS for refresh_folders_other_info');
             console.log(sending);
         }
-        
+
         $.post(
             'sources/items.queries.php', {
                 type: 'refresh_folders_other_info',
@@ -4493,6 +4626,12 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
      * builds the folders tree
      */
     function refreshTree(node_to_select = '', do_refresh = false, refresh_visible_folders = true) {
+        if (activeFolderSearchTerm.length < 6) {
+            toastr.remove()
+            toastr.info('Search folders (minimum 6 characters) to load results.')
+            return false
+        }
+
         let folderToSelect = node_to_select;
 
         if (folderToSelect === '' || folderToSelect === false || typeof folderToSelect === 'undefined' || folderToSelect === null) {
@@ -4526,7 +4665,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             try {
                 localStorage.removeItem('tp_tree_version');
                 localStorage.removeItem('tp_tree_data');
-            } catch(e) {}
+            } catch (e) {}
 
             $('#jstree').one('refresh.jstree', function(e, data) {
                 const parsedFolderToSelect = parseInt(folderToSelect, 10);
@@ -4633,7 +4772,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 }
             );
         }
-        
+
         // Show list of sub directories - Load only once
         if (store.get('teampassUser').show_subfolders === 1 && start === 0) {
             // Normalize to integer: groupe_id may be a string (from .val()) or integer (from jstree).
@@ -4673,7 +4812,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 'teampassApplication',
                 function(teampassApplication) {
                     teampassApplication.selectedFolder = parseInt(groupe_id),
-                    teampassApplication.itemsList = ''
+                        teampassApplication.itemsList = ''
                 }
             );
 
@@ -4705,7 +4844,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
             // Hide/show list of subfolders
             $('#table_teampass_subfolders_list').toggleClass('hidden', store.get('teampassUser').show_subfolders !== 1);
-            
+
             //ajax query
             var request = $.post('sources/items.queries.php', {
                     type: 'do_items_list_in_folder',
@@ -4745,12 +4884,14 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
                     // Hide New button if restricted folder or folder is not accessible
                     $('#btn-new-item').toggleClass('hidden', data.access_level === 10 || isNotAuthorized === true);
-                    
+
                     // to be done only in 1st list load
                     if (isNotAuthorized === true) {
                         $('#items_folder_path').html('<i class="fa-solid fa-folder-open-o"></i>&nbsp;' + rebuildPath(data.arborescence));
                     } else if (call_to_be_continued === false) {
-                        var initialQueryData = hasUniqueLoadData === true ? $.parseJSON(data.uniqueLoadData) : { path: [] };
+                        var initialQueryData = hasUniqueLoadData === true ? $.parseJSON(data.uniqueLoadData) : {
+                            path: []
+                        };
 
                         // Update hidden variables
                         store.update(
@@ -4762,7 +4903,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                                     teampassItem.hasCustomCategories = data.categoriesStructure
                             }
                         );
-                        
+
 
                         // display path of folders
                         $('#form-folder-path').html(
@@ -4813,7 +4954,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                                 '<i class="fa-solid fa-warning mr-2"></i><?php echo $lang->get('not_allowed_to_see_pw'); ?></b>' +
                                 '</div>')
                             .removeClass('hidden');
-                            
+
                     } else if ((store.get('teampassApplication').userIsReadOnly === 1) //&& data.folder_requests_psk == 0
                         ||
                         data.access_level === 10
@@ -4922,13 +5063,13 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 teampassApplication.itemsList = JSON.stringify(stored_datas);
             }
         );
-        
+
         $.each(listOfItems, function(i, value) {
             var new_line = '',
                 pwd_error = '',
                 icon_all_can_modify = '',
                 icon_cannot_see = '',
-                icon_open= '',
+                icon_open = '',
                 icon_login = '',
                 icon_link = '',
                 icon_pwd = '',
@@ -4960,18 +5101,18 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             if (value.rights > 0 && value.user_restriction_allowed_for_user === true) {
                 // Should I populate previous item with this new id
                 if (debugJavascript === true) {
-                    console.log('current id: '+value.item_id);
+                    console.log('current id: ' + value.item_id);
                     console.log(prevIdForNextItem);
                 }
                 if (prevIdForNextItem !== -1) {
                     //$('#list-item-row_' + value.item_id).attr('data-next-item-id', prevIdForNextItem.item_id);
                     //$('#list-item-row_' + value.item_id).attr('data-next-item-label', value.label);
-                    $('[data-item-key="'+value.item_key+'"]')
+                    $('[data-item-key="' + value.item_key + '"]')
                         //.attr('data-next-item-id', prevIdForNextItem.item_id)
                         .attr('data-next-item-key', prevIdForNextItem.item_key)
                         .attr('data-next-item-label', value.label);
                 }
-                
+
                 // Prepare anyone can modify icon
                 if ((value.anyone_can_modify === 1 || value.open_edit === 1)) {
                     icon_all_can_modify = '<span class="fa-stack fa-clickable pointer infotip list-item-clicktoedit mr-2" title="<?php echo $lang->get('edit'); ?>"><i class="fa-solid fa-circle fa-stack-2x"></i><i class="fa-solid fa-pen fa-stack-1x fa-inverse"></i></span>';
@@ -5037,7 +5178,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     .replace(/\u00A0/g, ' ')
                     .replace(/\s+/g, ' ')
                     .trim();
-                description = (descPreview !== '' ? '<i>'+itemLabel + '</i><i class="fa-solid fa-heading mr-1 ml-2"></i>' + descPreview : '<i>'+itemLabel + '</i>');
+                description = (descPreview !== '' ? '<i>' + itemLabel + '</i><i class="fa-solid fa-heading mr-1 ml-2"></i>' + descPreview : '<i>' + itemLabel + '</i>');
                 // Consolidate item label
                 if (description !== '') {
                     description = '<span class="text-secondary small d-inline-block text-truncate">' + description + '</span>';
@@ -5053,7 +5194,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     '<td class="list-item-description px-3 py-0 align-middle d-flex">' +
                     '<span class="icon-container">' +
                     // Show user a grippy bar to move item
-                    (value.canMove === 1  ? '<i class="fa-solid fa-ellipsis-v mr-1 dragndrop"></i>' : '') + //&& value.is_result_of_search === 0
+                    (value.canMove === 1 ? '<i class="fa-solid fa-ellipsis-v mr-1 dragndrop"></i>' : '') + //&& value.is_result_of_search === 0
                     // Show user a ban icon if expired
                     (value.expired === 1 ? '<i class="fa-regular fa-calendar-times mr-1 text-warning infotip" title="<?php echo $lang->get('not_allowed_to_see_pw_is_expired'); ?>"></i>' : '') +
                     // Show user that Item is not accessible
@@ -5065,7 +5206,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     '<span class="list-item-clicktoshow d-inline-flex align-items-center' + (value.rights === 10 ? '' : ' pointer') + '" data-item-id="' + value.item_id + '" data-item-key="' + value.item_key + '">' +
                     corruption_marker +
                     // Show item fa_icon if set
-                    (value.fa_icon !== '' ? '<i class="'+value.fa_icon+' mr-1 user-fa-icon"></i>' : '') +
+                    (value.fa_icon !== '' ? '<i class="' + value.fa_icon + ' mr-1 user-fa-icon"></i>' : '') +
                     '<span class="list-item-row-description d-inline-block' + (value.rights === 10 ? ' font-weight-light' : '') + '"><i class="item-favorite-star fa-solid' + ((store.get('teampassApplication').highlightFavorites === 1 && value.is_favourited === 1) ? ' fa-star mr-1' : '') + '"></i>' + value.label + '</span>' + (value.rights === 10 ? '' : description) +
                     '<span class="list-item-row-description-extend"></span>' +
                     '</span>' +
@@ -5084,7 +5225,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 // Save id for usage
                 prevIdForNextItem = {
                     //'item_id' : value.item_id,
-                    'item_key' : value.item_key,
+                    'item_key': value.item_key,
                     'label': value.label,
                 };
 
@@ -5092,7 +5233,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             }
         });
 
-        
+
 
         // Sort entries
         var $tbody = $('#teampass_items_list');
@@ -5145,7 +5286,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
             // Prevent duplicate ListerItems via the select_node.jstree event handler
             startedItemsListQuery = true;
-            
+
             // Show loading toastr and load items
             ListerItems(
                 $(this).data('tree-id'),
@@ -5196,7 +5337,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     teampassApplication.itemsListStop = 0;
                 }
             );
-            
+
             // Perform listing
             ListerItems(
                 store.get('teampassApplication').itemsListFolderId,
@@ -5276,7 +5417,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                             () => {
                                 const clipboardStatus = JSON.parse(localStorage.getItem('clipboardStatus'));
                                 if (clipboardStatus.status === 'unsafe') {
-                                    return;                                        
+                                    return;
                                 }
                                 toastr.success('<?php echo $lang->get("clipboard_cleared"); ?>', '', {
                                     timeOut: 2000,
@@ -5304,7 +5445,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 try {
                     // Get text in attribute data-clipboard-text
                     const loginText = this.getAttribute('data-clipboard-text');
-                    
+
                     if (!loginText) {
                         return;
                     }
@@ -5371,8 +5512,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
     /**
      *
      */
-    function Details(itemDefinition, actionType, hotlink = false)
-    {
+    function Details(itemDefinition, actionType, hotlink = false) {
         if (debugJavascript === true) {
             console.info('EXPECTED ACTION on ' + itemDefinition + ' is ' + actionType + ' -- ');
             console.log(itemDefinition);
@@ -5431,12 +5571,11 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             if (actionType === 'edit' && retData.edition_locked === true) {
                 toastr.remove();
                 toastr.error(
-                    '<?php echo $lang->get('error_item_currently_being_updated').'<br/>'.
-                        $lang->get('remaining_lock_time'); ?>' +
-                        (retData.edition_locked_delay === null ?
-                        ''
-                        :
-                        ' : ' + retData.edition_locked_delay + ' <?php echo $lang->get('seconds');?>'),
+                    '<?php echo $lang->get('error_item_currently_being_updated') . '<br/>' .
+                            $lang->get('remaining_lock_time'); ?>' +
+                    (retData.edition_locked_delay === null ?
+                        '' :
+                        ' : ' + retData.edition_locked_delay + ' <?php echo $lang->get('seconds'); ?>'),
                     '', {
                         timeOut: 5000,
                         progressBar: true
@@ -5448,16 +5587,16 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 requestRunning = false;
                 return false;
             }
-            
+
             // Start edition lock heartbeat when editing is allowed
             if (actionType === 'edit' && retData.edition_locked !== true) {
                 startEditionLockHeartbeat(itemId)
             }
 
             // Is the user allowed?
-            if (retData.access === false
-                || (actionType === 'edit' && retData.edit === false)
-                || (actionType === 'delete' && retData.delete === false)
+            if (retData.access === false ||
+                (actionType === 'edit' && retData.edit === false) ||
+                (actionType === 'delete' && retData.delete === false)
             ) {
                 toastr.remove();
                 toastr.error(
@@ -5474,7 +5613,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
             // Store current view
             savePreviousView();
-            
+
             if (debugJavascript === true) console.log("Request is running: " + requestRunning)
 
             // Store status query running
@@ -5593,14 +5732,14 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                                     progressBar: true
                                 }
                             );
-                            
+
                             if (debugJavascript === true) console.log('LDAP user password has to encrypt his private key with hos new LDAP password')
                             // HIde
                             $('.content-header, .content').addClass('hidden');
 
                             // Show passwords inputs and form
                             $('#dialog-ldap-user-change-password-info')
-                                .html('<i class="icon fa-solid fa-info mr-2"></i><?php echo $lang->get('ldap_user_has_changed_his_password');?>')
+                                .html('<i class="icon fa-solid fa-info mr-2"></i><?php echo $lang->get('ldap_user_has_changed_his_password'); ?>')
                                 .removeClass('hidden');
                             $('#dialog-ldap-user-change-password').removeClass('hidden');
                         } else if (data.error_type !== 'undefined') {
@@ -5619,11 +5758,11 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
                                 // Show passwords inputs and form
                                 $('#dialog-ldap-user-change-password-info')
-                                    .html('<i class="icon fa-solid fa-info mr-2"></i><?php echo $lang->get('ldap_user_has_changed_his_password');?>')
+                                    .html('<i class="icon fa-solid fa-info mr-2"></i><?php echo $lang->get('ldap_user_has_changed_his_password'); ?>')
                                     .removeClass('hidden');
                                 $('#dialog-ldap-user-change-password').removeClass('hidden');
                             });
-                            
+
                         }
 
 
@@ -5689,7 +5828,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
                     // we have an error in the password : pwd_encryption_error
                     if (data.pwd_encryption_error === 'inconsistent_password') {
-                        $('#card-item-pwd').after('<i class="fa-solid fa-bell text-orange fa-shake ml-3 delete-after-usage infotip" title="'+data.pwd_encryption_error_message+'"></i>');
+                        $('#card-item-pwd').after('<i class="fa-solid fa-bell text-orange fa-shake ml-3 delete-after-usage infotip" title="' + data.pwd_encryption_error_message + '"></i>');
                     }
 
                     $('#card-item-corrupted-warning')
@@ -5721,15 +5860,15 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                         'teampassItem',
                         function(teampassItem) {
                             teampassItem.id = parseInt(data.id),
-                            teampassItem.tree_id = parseInt(data.folder),
-                            teampassItem.folderId = parseInt(data.folder),
-                            teampassItem.timestamp = data.timestamp,
-                            teampassItem.user_can_modify = data.user_can_modify,
-                            teampassItem.anyone_can_modify = data.anyone_can_modify,
-                            teampassItem.edit_item_salt_key = data.edit_item_salt_key,
-                            teampassItem.id_restricted_to = data.id_restricted_to,
-                            teampassItem.id_restricted_to_roles = data.id_restricted_to_roles,
-                            teampassItem.item_rights = itemRights
+                                teampassItem.tree_id = parseInt(data.folder),
+                                teampassItem.folderId = parseInt(data.folder),
+                                teampassItem.timestamp = data.timestamp,
+                                teampassItem.user_can_modify = data.user_can_modify,
+                                teampassItem.anyone_can_modify = data.anyone_can_modify,
+                                teampassItem.edit_item_salt_key = data.edit_item_salt_key,
+                                teampassItem.id_restricted_to = data.id_restricted_to,
+                                teampassItem.id_restricted_to_roles = data.id_restricted_to_roles,
+                                teampassItem.item_rights = itemRights
                         }
                     );
 
@@ -5779,7 +5918,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                                 .removeClass('col-md-5')
                                 .addClass('col-md-12');
                         }
-                        
+
                         // Show item details
                         $('#items-details-container').removeClass('hidden');
 
@@ -5805,7 +5944,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     $('#items-details-container').data('id', data.id);
 
                     // Prepare card
-                    const itemIcon = (data.fa_icon !== "") ? '<i class="'+data.fa_icon+' mr-1"></i>' : '';
+                    const itemIcon = (data.fa_icon !== "") ? '<i class="' + data.fa_icon + ' mr-1"></i>' : '';
                     $('#card-item-label, #form-item-title').html(itemIcon + data.label);
 
                     // Remove any stale edition lock badge from a previously viewed item
@@ -5987,7 +6126,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                             $(data.categories).each(function(index, category) {
                                 $('#form-item-field, #form-item-category-' + category).removeClass('hidden');
                             });
-                            
+
                             // Now show expected fields and values
                             $(data.fields).each(function(index, field) {
                                 // Show cateogry
@@ -6101,11 +6240,11 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                             try {
                                 // Retrieve the target defined by data-clipboard-target
                                 const targetId = this.getAttribute('data-clipboard-target');
-                                
+
                                 if (!targetId) return;
 
                                 // Grab the node (login => <span>, url => <span> ou <a>, email => <span>, etc.)
-                                const $el = $('#'+targetId);
+                                const $el = $('#' + targetId);
                                 if ($el.length === 0) throw new Error('target-not-found');
 
                                 // Compute text to copy depending on element type
@@ -6113,12 +6252,12 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                                 if ($el.is('input, textarea')) {
                                     textToCopy = $el.val() || '';
                                 } else if ($el.is('a')) {
-                                // For links, prefer href; fallback to visible text
-                                textToCopy = $el.attr('href') || ($el.text() || '').trim();
+                                    // For links, prefer href; fallback to visible text
+                                    textToCopy = $el.attr('href') || ($el.text() || '').trim();
                                 } else {
                                     // span/div/etc.
                                     textToCopy = ($el.text() || '').trim();
-                                }	
+                                }
                                 if (!textToCopy) throw new Error('empty');
 
                                 // Try modern API, fallback to execCommand
@@ -6133,7 +6272,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                                     document.execCommand('copy');
                                     document.body.removeChild(ta);
                                 };
-                    
+
                                 if (navigator.clipboard && navigator.clipboard.writeText) {
                                     await navigator.clipboard.writeText(textToCopy);
                                 } else {
@@ -6219,7 +6358,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                                         () => {
                                             const clipboardStatus = JSON.parse(localStorage.getItem('clipboardStatus'));
                                             if (clipboardStatus.status === 'unsafe') {
-                                                return;                                        
+                                                return;
                                             }
                                             toastr.success('<?php echo $lang->get("clipboard_cleared"); ?>', '', {
                                                 timeOut: 2000,
@@ -6337,24 +6476,25 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     }
 
                     // Prepare bottom buttons
-                    if ($('#list-item-row_'+data.id).prev('.list-item-row').attr('data-item-id') !== undefined) {
+                    if ($('#list-item-row_' + data.id).prev('.list-item-row').attr('data-item-id') !== undefined) {
                         $('.but-prev-item')
-                            .html('<i class="fa-solid fa-arrow-left mr-2"></i>' + unescape($('#list-item-row_'+data.id).prev('.list-item-row').attr('data-label')))
-                            .attr('data-prev-item-id', $('#list-item-row_'+data.id).prev('.list-item-row').attr('data-item-id'))
+                            .html('<i class="fa-solid fa-arrow-left mr-2"></i>' + unescape($('#list-item-row_' + data.id).prev('.list-item-row').attr('data-label')))
+                            .attr('data-prev-item-id', $('#list-item-row_' + data.id).prev('.list-item-row').attr('data-item-id'))
                             .removeClass('hidden');
                     }
-                    if ($('#list-item-row_'+data.id).next('.list-item-row').attr('data-item-id') !== undefined) {
+                    if ($('#list-item-row_' + data.id).next('.list-item-row').attr('data-item-id') !== undefined) {
                         $('.but-next-item')
-                            .html('<i class="fa-solid fa-arrow-right mr-2"></i>' + unescape($('#list-item-row_'+data.id).next('.list-item-row').attr('data-label')))
-                            .attr('data-next-item-id', $('#list-item-row_'+data.id).next('.list-item-row').attr('data-item-id'))
+                            .html('<i class="fa-solid fa-arrow-right mr-2"></i>' + unescape($('#list-item-row_' + data.id).next('.list-item-row').attr('data-label')))
+                            .attr('data-next-item-id', $('#list-item-row_' + data.id).next('.list-item-row').attr('data-item-id'))
                             .removeClass('hidden');
                     }
 
                     // Inform user
                     //toastr.remove();
                     toastrUpdate(loadingToast, 'success',
-                        '<?php echo $lang->get('done'); ?>',
-                        { timeOut: 1000 }
+                        '<?php echo $lang->get('done'); ?>', {
+                            timeOut: 1000
+                        }
                     );
 
                     return true;
@@ -6439,7 +6579,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                             htmlFull += '<div class="col-6 edit-attachment-div"><div class="info-box bg-secondary-gradient">' +
                                 '<span class="info-box-icon bg-info"><i class="' + value.icon + '"></i></span>' +
                                 '<div class="info-box-content"><span class="info-box-text">' + filename + '.' + value.extension + '</span>' +
-                                '<span class="info-box-text">' + downloadIcon +'</span>' +
+                                '<span class="info-box-text">' + downloadIcon + '</span>' +
                                 '<span class="info-box-text"><i class="fa-solid fa-trash pointer delete-file" data-file-id="' + value.id + '"></i></span></div>' +
                                 '</div></div>';
 
@@ -6464,15 +6604,15 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 // Show restrictions with Badges
                 var html_restrictions = '';
                 $.each(store.get('teampassItem').id_restricted_to, function(i, value) {
-                    html_restrictions +='<span class="badge badge-info mr-2 mb-1"><i class="fa-solid fa-group fa-sm mr-1"></i>' +
+                    html_restrictions += '<span class="badge badge-info mr-2 mb-1"><i class="fa-solid fa-group fa-sm mr-1"></i>' +
                         data.users_list.find(x => x.id === parseInt(value)).name + '</span>';
-                }); 
-                        
-                $.each(store.get('teampassItem').id_restricted_to_roles, function(i, value) {                   
+                });
+
+                $.each(store.get('teampassItem').id_restricted_to_roles, function(i, value) {
                     const role = data.roles_list.find(x => x.id === parseInt(value));
-                    html_restrictions += (role ? '<span class="badge badge-info mr-2 mb-1"><i class="fa-solid fa-group fa-sm mr-1"></i>' + role.title  + '</span>' : '');
-                });     
-                        
+                    html_restrictions += (role ? '<span class="badge badge-info mr-2 mb-1"><i class="fa-solid fa-group fa-sm mr-1"></i>' + role.title + '</span>' : '');
+                });
+
                 if (html_restrictions === '') {
                     $('#card-item-restrictedto').html('<?php echo $lang->get('no_special_restriction'); ?>');
                 } else {
@@ -6600,7 +6740,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                         data: prepareExchangedData(JSON.stringify(data), 'encode', '<?php echo $session->get('key'); ?>'),
                         key: '<?php echo $session->get('key'); ?>'
                     },
-                    function (data) {
+                    function(data) {
                         /*// add track-change class on item form
                         setTimeout(
                             $('#form-item-label, #form-item-description, #form-item-login, #form-item-password, #form-item-email, #form-item-url, #form-item-folder, #form-item-restrictedto, #form-item-tags, #form-item-anyoneCanModify, #form-item-deleteAfterShown, #form-item-deleteAfterDate, #form-item-anounce, .form-item-field-custom').addClass('track-change'),
@@ -6642,20 +6782,20 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     data = decodeQueryReturn(data, '<?php echo $session->get('key'); ?>', 'items.queries.php', 'showDetailsStep3');
 
                     if (data.otp_code !== '' && data.otp_expires_in !== '' && parseInt(data.otp_enabled) === 1 && data.message === '') {
-                        $('#card-item-opt_code').html(data.otp_code+'</span><i class="fa-regular fa-copy ml-2 text-secondary pointer" id="clipboard_otpcode"></i><span class="ml-2">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span id="countdown_otp" style="position: absolute;right:0px;"></span><span>');   
-                        
+                        $('#card-item-opt_code').html(data.otp_code + '</span><i class="fa-regular fa-copy ml-2 text-secondary pointer" id="clipboard_otpcode"></i><span class="ml-2">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span id="countdown_otp" style="position: absolute;right:0px;"></span><span>');
+
                         // show countdown
                         $("#countdown_otp").countdown360({
-                            radius      : 10,
-                            seconds     : data.otp_expires_in,
-                            fillStyle   : '#56bbd9',
-                            strokeStyle : '#007bff',
-                            fontSize    : 11,
-                            fontColor   : '#FFFFFF',
+                            radius: 10,
+                            seconds: data.otp_expires_in,
+                            fillStyle: '#56bbd9',
+                            strokeStyle: '#007bff',
+                            fontSize: 11,
+                            fontColor: '#FFFFFF',
                             label: false,
                             autostart: false,
                         }).start();
-                        
+
 
                         // Prepare Clipboard for OTP Code                        
                         document.getElementById('clipboard_otpcode').addEventListener('click', async function() {
@@ -6696,7 +6836,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                         }
 
                         // Prepare recursive call to get new OTP code
-                        var replayDelayInMilliseconds = data.otp_expires_in*1000;
+                        var replayDelayInMilliseconds = data.otp_expires_in * 1000;
                         intervalId = setTimeout(function() {
                             showOTPCode(id);
                         }, replayDelayInMilliseconds);
@@ -6847,7 +6987,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             }
         }
     });
-    
+
     // Handle the icon + is clicked
     $(document).on('click', '.add-button', function() {
         if ($(this).data('add-type') === 'history') {
@@ -6922,7 +7062,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     }
                 );
             });
-            
+
         } else if ($(this).data('add-type') === 'attachment') {
             // ATTACHMENTS
             console.log('attachment')
@@ -7015,8 +7155,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         );
     };
 
-    function loadItemHistory(item_id, collapsed = true)
-    {
+    function loadItemHistory(item_id, collapsed = true) {
         $.post(
             "sources/items.queries.php", {
                 type: "load_item_history",
@@ -7060,7 +7199,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     $.each(data.previous_passwords, function(i, value) {
                         previousPasswords += '<div class="row"><div class="col-8"><i class="fa-solid fa-key fa-2xs mr-2"></i><code>' + value.password + '</code></div><div class="col-4"><span class="badge bg-info text-dark">' + value.date + '</span></div></div>';
                     });
-                    
+
                     // SHow dialog
                     $(document).on('click', '#card-item-password-history-button', function() {
                         showModalDialogBox(
@@ -7240,7 +7379,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
     });
 
     // Handle max value for OTV days number
-    $('#form-item-otv-days').change(function () {
+    $('#form-item-otv-days').change(function() {
         console.log(parseInt($(this).attr('max')));
         if ($(this).val() > parseInt($(this).attr('max'))) {
             $(this).val($(this).attr('max'));
@@ -7256,7 +7395,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         if (val === false) {
             val = selectedFolderId;
         }
-        if (debugJavascript === true) console.log('Get privilege for folder ' + val);        
+        if (debugJavascript === true) console.log('Get privilege for folder ' + val);
 
         return new Promise(function(resolve, reject) {
             if (val === "" || typeof val === "undefined" || val === false) {
@@ -7302,13 +7441,13 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     requestRunning = false;
                     return false;
                 }
-                
+
                 // Is the user allowed?
                 // edit===0 means new item creation: check create right (NDNE allows it, R does not).
                 // edit===1 means editing an existing item: check edit right instead.
-                if (retData.access === false
-                    || (edit === 0 && retData.create === false)
-                    || (edit !== 0 && retData.edit === false)
+                if (retData.access === false ||
+                    (edit === 0 && retData.create === false) ||
+                    (edit !== 0 && retData.edit === false)
                 ) {
                     toastr.remove();
                     toastr.error(
@@ -7392,14 +7531,22 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                             const restrictedRoles = store.get('teampassItem').id_restricted_to_roles
                             const selectedValues = []
                             if (Array.isArray(restrictedUsers)) {
-                                restrictedUsers.forEach(id => { if (id) selectedValues.push(String(id)) })
+                                restrictedUsers.forEach(id => {
+                                    if (id) selectedValues.push(String(id))
+                                })
                             } else if (restrictedUsers) {
-                                String(restrictedUsers).split(';').forEach(id => { if (id) selectedValues.push(id) })
+                                String(restrictedUsers).split(';').forEach(id => {
+                                    if (id) selectedValues.push(id)
+                                })
                             }
                             if (Array.isArray(restrictedRoles)) {
-                                restrictedRoles.forEach(id => { if (id) selectedValues.push('role_' + id) })
+                                restrictedRoles.forEach(id => {
+                                    if (id) selectedValues.push('role_' + id)
+                                })
                             } else if (restrictedRoles) {
-                                String(restrictedRoles).split(';').forEach(id => { if (id) selectedValues.push('role_' + id) })
+                                String(restrictedRoles).split(';').forEach(id => {
+                                    if (id) selectedValues.push('role_' + id)
+                                })
                             }
                             $('#form-item-restrictedto').val(selectedValues).trigger('change')
                         }
@@ -7408,7 +7555,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                             'teampassItem',
                             function(teampassItem) {
                                 teampassItem.folderId = data.folderId === undefined ? val : parseInt(data.folderId, 10),
-                                teampassItem.tree_id = data.folderId === undefined ? teampassItem.tree_id : parseInt(data.folderId, 10),
+                                    teampassItem.tree_id = data.folderId === undefined ? teampassItem.tree_id : parseInt(data.folderId, 10),
                                     teampassItem.error = data.error === undefined ? '' : data.error,
                                     teampassItem.message = data.message === undefined ? '' : data.message,
                                     teampassItem.folderComplexity = data.val === undefined ? '' : parseInt(data.val),
@@ -7629,12 +7776,12 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
     $('#pwd-definition-size, .password-definition').on('change', function() {
         try {
             localStorage.setItem('tp_pwd_gen_opts', JSON.stringify({
-                size:    $('#pwd-definition-size').val(),
-                lcl:     $('#pwd-definition-lcl').prop('checked'),
-                ucl:     $('#pwd-definition-ucl').prop('checked'),
+                size: $('#pwd-definition-size').val(),
+                lcl: $('#pwd-definition-lcl').prop('checked'),
+                ucl: $('#pwd-definition-ucl').prop('checked'),
                 numeric: $('#pwd-definition-numeric').prop('checked'),
                 symbols: $('#pwd-definition-symbols').prop('checked'),
-                secure:  $('#pwd-definition-secure').prop('checked'),
+                secure: $('#pwd-definition-secure').prop('checked'),
             }))
         } catch (_) {}
     })
@@ -7659,17 +7806,18 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
      * - Passphrase generator: only separator restored; word count and capitalize
      *   are always derived from folder complexity via syncPassphraseOptionsWithComplexity().
      */
-    ;(function loadGeneratorOptionsFromStorage() {
+    ;
+    (function loadGeneratorOptionsFromStorage() {
         try {
             const pwdOpts = JSON.parse(localStorage.getItem('tp_pwd_gen_opts') || 'null')
             if (pwdOpts) {
                 if (pwdOpts.size) $('#pwd-definition-size').val(pwdOpts.size)
                 $.each({
-                    '#pwd-definition-lcl':     pwdOpts.lcl,
-                    '#pwd-definition-ucl':     pwdOpts.ucl,
+                    '#pwd-definition-lcl': pwdOpts.lcl,
+                    '#pwd-definition-ucl': pwdOpts.ucl,
                     '#pwd-definition-numeric': pwdOpts.numeric,
                     '#pwd-definition-symbols': pwdOpts.symbols,
-                    '#pwd-definition-secure':  pwdOpts.secure,
+                    '#pwd-definition-secure': pwdOpts.secure,
                 }, function(sel, checked) {
                     $(sel).prop('checked', !!checked).closest('label').toggleClass('active', !!checked)
                 })
@@ -7726,8 +7874,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
     }
 
 
-    function prepareFolderDragNDrop()
-    {
+    function prepareFolderDragNDrop() {
         $('.is-draggable').draggable({
             cursor: 'move',
             cursorAt: {
@@ -7744,8 +7891,8 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             },
             helper: function(event) {
                 return $('<div>')
-                            .addClass('bg-gray p-2 font-weight-light')
-                            .text($(this).find('.list-item-row-description').text());
+                    .addClass('bg-gray p-2 font-weight-light')
+                    .text($(this).find('.list-item-row-description').text());
             }
         });
         $('.folder').droppable({
@@ -7830,7 +7977,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                             ui.draggable.removeClass('hidden');
                             return false;
                         }
-                        
+
                         //increment / decrement number of items in folders
                         $('#itcount_' + data.from_folder).text(refreshFolderCounters($('#itcount_' + data.from_folder).text(), 'decrement'));
                         $('#itcount_' + data.to_folder).text(refreshFolderCounters($('#itcount_' + data.to_folder).text(), 'increment'));
@@ -7851,8 +7998,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
     /**
      * Permits to refresh the folder counters when performing an item drag and drop
      */
-    function refreshFolderCounters(counter, operation)
-    {
+    function refreshFolderCounters(counter, operation) {
         var splitCounter = counter.split('/');
         if (splitCounter.length <= 3) {
             if (operation === 'increment') {
@@ -7867,20 +8013,18 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 }
             }
         }
-        
+
         return splitCounter.join('/');
     }
 
-    function clearPendingItemDetailsFallback()
-    {
+    function clearPendingItemDetailsFallback() {
         if (pendingItemDetailsFallback !== null) {
             window.clearTimeout(pendingItemDetailsFallback);
             pendingItemDetailsFallback = null;
         }
     }
 
-    function reloadItemDetailsAfterSave(itemId, encryptionTaskCreated)
-    {
+    function reloadItemDetailsAfterSave(itemId, encryptionTaskCreated) {
         var normalizedItemId = parseInt(itemId, 10);
         var websocketExpected = parseInt(websocketEnabledForItems, 10) === 1;
 
@@ -7919,7 +8063,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 if (!saveInProgress) {
                     saveInProgress = true;
                     $('#form-item-button-save').click();
-                    setTimeout(() => { saveInProgress = false; }, 1000);
+                    setTimeout(() => {
+                        saveInProgress = false;
+                    }, 1000);
                 }
                 return false;
             }
@@ -7986,9 +8132,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         };
 
         $(document).on('teampass:folders:refresh', function() {
-            const currentFolder = store.get('teampassApplication')
-                ? (store.get('teampassApplication').itemsListFolderId || store.get('teampassApplication').selectedFolder || '')
-                : '';
+            const currentFolder = store.get('teampassApplication') ?
+                (store.get('teampassApplication').itemsListFolderId || store.get('teampassApplication').selectedFolder || '') :
+                '';
             window.refreshTree(currentFolder, true, true);
         });
 
@@ -8005,14 +8151,16 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 localStorage.removeItem('tp_tree_version');
                 localStorage.removeItem('tp_tree_data');
                 localStorage.removeItem('tp_folders_version');
-            } catch(e) {}
+            } catch (e) {}
 
             // AJAX call to items.queries.php goes through core.php
             // which recalculates identifyUserRights() from DB
             $.post(
                 'sources/items.queries.php', {
                     type: 'refresh_visible_folders',
-                    data: prepareExchangedData(JSON.stringify({'force_refresh_cache': true}), 'encode', '<?php echo $session->get('key'); ?>'),
+                    data: prepareExchangedData(JSON.stringify({
+                        'force_refresh_cache': true
+                    }), 'encode', '<?php echo $session->get('key'); ?>'),
                     key: '<?php echo $session->get('key'); ?>'
                 },
                 function(data) {

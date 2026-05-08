@@ -36,7 +36,7 @@ use TeampassClasses\PerformChecks\PerformChecks;
 use TeampassClasses\ConfigManager\ConfigManager;
 
 // Load functions
-require_once __DIR__.'/../sources/main.functions.php';
+require_once __DIR__ . '/../sources/main.functions.php';
 // init
 $session = SessionManager::getSession();
 $request = SymfonyRequest::createFromGlobals();
@@ -305,7 +305,7 @@ if ((int) $session_user_admin === 1) {
                                     <span class="ml-2 col-md-1 clear-me-html" id="form-item-icon-show"></span>
                                 </div>
                                 <small class='form-text text-muted'>
-                                    <?php echo $lang->get('fontawesome_icon_tip'); ?><a href="<?php echo FONTAWESOME_URL;?>" target="_blank"><i class="fa-solid fa-external-link-alt ml-1"></i></a>
+                                    <?php echo $lang->get('fontawesome_icon_tip'); ?><a href="<?php echo FONTAWESOME_URL; ?>" target="_blank"><i class="fa-solid fa-external-link-alt ml-1"></i></a>
                                 </small>
                             </div>
 
@@ -341,11 +341,11 @@ if ((int) $session_user_admin === 1) {
                                     isset($SETTINGS['anyone_can_modify']) === true
                                     && (int) $SETTINGS['anyone_can_modify'] === 1
                                 ) {
-                                    ?>
+                                ?>
                                     <div class="form-check mb-3 icheck-blue">
                                         <input type="checkbox" class="form-check-input form-item-control flat-blue" id="form-item-anyoneCanModify" <?php
-                                            echo isset($SETTINGS['anyone_can_modify_bydefault']) === true
-                                            && (int) $SETTINGS['anyone_can_modify_bydefault'] === 1 ? ' checked' : ''; ?> data-change-ongoing="">
+                                                                                                                                                    echo isset($SETTINGS['anyone_can_modify_bydefault']) === true
+                                                                                                                                                        && (int) $SETTINGS['anyone_can_modify_bydefault'] === 1 ? ' checked' : ''; ?> data-change-ongoing="">
                                         <label class="form-check-label ml-3" for="form-item-anyoneCanModify"><?php echo $lang->get('anyone_can_modify'); ?></label>
                                     </div>
                                 <?php
@@ -393,7 +393,7 @@ if ((int) $session_user_admin === 1) {
                                     isset($SETTINGS['enable_delete_after_consultation']) === true
                                     && (int) $SETTINGS['enable_delete_after_consultation'] === 1
                                 ) {
-                                    ?>
+                                ?>
                                     <div class="callout callout-primary mb-3">
                                         <div class="card-header">
                                             <h3 class="card-title">
@@ -493,64 +493,64 @@ if ((int) $session_user_admin === 1) {
                             <div class="tab-pane" id="tab_4">
                                 <div id="form-item-field" class="hidden">
                                     <?php
-                                        $session_item_fields = $session->get('system-item_fields');//print_r($session_item_fields);
-                                        if (isset($session_item_fields) === true) {
-                                            foreach ($session_item_fields as $category) {
-                                                //print_r($category);
-                                                echo '
+                                    $session_item_fields = $session->get('system-item_fields'); //print_r($session_item_fields);
+                                    if (isset($session_item_fields) === true) {
+                                        foreach ($session_item_fields as $category) {
+                                            //print_r($category);
+                                            echo '
                                             <div class="callout callout-info form-item-category hidden" id="form-item-category-' . $category['id'] . '">
                                                 <h5>' . $category['title'] . '</h5>
                                                 <p>';
-                                                foreach ($category['fields'] as $field) {
-                                                    if ($field['type'] === 'textarea') {
-                                                        echo '
+                                            foreach ($category['fields'] as $field) {
+                                                if ($field['type'] === 'textarea') {
+                                                    echo '
                                                     <div class="form-group mb-3 form-item-field" id="form-item-field-' . $field['id'] . '" data-field-id="' . $field['id'] . '">
                                                         <label>' . $field['title'],
-                                                            $field['is_mandatory'] === '1' ?
-                                                                '<span class="fa-solid fa-fire text-danger ml-1 infotip" title="' . $lang->get('is_mandatory') . '"></span>' : '',
-                                                            '</label>
+                                                    $field['is_mandatory'] === '1' ?
+                                                        '<span class="fa-solid fa-fire text-danger ml-1 infotip" title="' . $lang->get('is_mandatory') . '"></span>' : '',
+                                                    '</label>
                                                         <textarea class="form-control form-item-control form-item-field-custom" rows="2" data-field-name="' . $field['id'] . '" data-field-mandatory="' . $field['is_mandatory'] . '" data-field-regex="' . $field['regex'] . '" data-change-ongoing="0"></textarea>
                                                     </div>';
-                                                    } else {
-                                                        echo '
+                                                } else {
+                                                    echo '
                                                     <div class="input-group mb-3 form-item-field" id="form-item-field-' . $field['id'] . '" data-field-id="' . $field['id'] . '">
                                                         <div class="input-group-prepend">
                                                             <span class="input-group-text">' . $field['title'],
-                                                            $field['is_mandatory'] === '1' ?
-                                                                '<span class="fa-solid fa-fire text-danger ml-1 infotip" title="' . $lang->get('is_mandatory') . '"></span>' : '',
-                                                            '</span>
+                                                    $field['is_mandatory'] === '1' ?
+                                                        '<span class="fa-solid fa-fire text-danger ml-1 infotip" title="' . $lang->get('is_mandatory') . '"></span>' : '',
+                                                    '</span>
                                                         </div>
                                                         <input type="' . $field['type'] . '" class="form-control form-item-control form-item-field-custom" data-field-name="' . $field['id'] . '" data-field-mandatory="' . $field['is_mandatory'] . '" data-field-regex="' . $field['regex'] . '" data-change-ongoing="0">
                                                     </div>';
-                                                    }
-                                                    if (!empty($field['regex'])) {
-                                                        echo '
-                                                    <div>Regex: '. $field['regex'] .'</div>
-                                                        ';
-                                                    }
                                                 }
-                                                // Manage template
-                                                if (
-                                                    isset($SETTINGS['item_creation_templates']) === true
-                                                    && $SETTINGS['item_creation_templates'] === '1'
-                                                ) {
+                                                if (!empty($field['regex'])) {
                                                     echo '
+                                                    <div>Regex: ' . $field['regex'] . '</div>
+                                                        ';
+                                                }
+                                            }
+                                            // Manage template
+                                            if (
+                                                isset($SETTINGS['item_creation_templates']) === true
+                                                && $SETTINGS['item_creation_templates'] === '1'
+                                            ) {
+                                                echo '
                                                     <div class="form-check icheck-blue">
                                                         <input type="checkbox" class="form-check-input form-check-input-template form-item-control flat-blue" data-category-id="' . $category['id'] . '" data-change-ongoing="0" data-field-name="template" id="template_' . $category['id'] . '">
                                                         <label class="form-check-label ml-3" for="template_' . $category['id'] . '">' . $lang->get('main_template') . '</label>
                                                     </div>';
-                                                }
-                                                echo '
+                                            }
+                                            echo '
                                                 </p>
                                             </div>';
-                                            }
-                                        } else {
-                                            echo
-                                            '<div class="alert alert-info">
+                                        }
+                                    } else {
+                                        echo
+                                        '<div class="alert alert-info">
                                                 <h5><i class="icon fa fa-info mr-3"></i>' . $lang->get('information') . '</h5>
                                                 ' . $lang->get('no_fields') . '
                                             </div>';
-                                        } ?>
+                                    } ?>
                                 </div>
                                 <div class="alert alert-info hidden no-item-fields">
                                     <h5><i class="icon fa fa-info mr-3"></i><?php echo $lang->get('information'); ?></h5>
@@ -688,10 +688,10 @@ if ((int) $session_user_admin === 1) {
                         <h5><i class="icon fa fa-info mr-2"></i><?php echo $lang->get('information'); ?></h5>
                         <p><?php
                             echo str_replace(
-        ['##otv_expiration_period##', '. '],
-        ['<span class="text-bold text-primary">' . $SETTINGS['otv_expiration_period'] . '</span>', '<br>'],
-        $lang->get('otv_message')
-    );
+                                ['##otv_expiration_period##', '. '],
+                                ['<span class="text-bold text-primary">' . $SETTINGS['otv_expiration_period'] . '</span>', '<br>'],
+                                $lang->get('otv_message')
+                            );
                             ?></p>
                     </div>
 
@@ -707,9 +707,9 @@ if ((int) $session_user_admin === 1) {
 
                     <div class="row">
                         <div class="form-group col-4">
-                            <label for="form-item-otv-days"><i class="fa-regular fa-calendar-days mr-2"></i><?php echo $lang->get('number_of_days'); ?> (<?php echo $lang->get('maximum').': '.$SETTINGS['otv_expiration_period'];?>)</label>
+                            <label for="form-item-otv-days"><i class="fa-regular fa-calendar-days mr-2"></i><?php echo $lang->get('number_of_days'); ?> (<?php echo $lang->get('maximum') . ': ' . $SETTINGS['otv_expiration_period']; ?>)</label>
                             <div class="input-group mb-3">
-                                <input type="number" class="form-control clear-me-val" id="form-item-otv-days" min="0" max="<?php echo $SETTINGS['otv_expiration_period'];?>" value="<?php echo $SETTINGS['otv_expiration_period'];?>">
+                                <input type="number" class="form-control clear-me-val" id="form-item-otv-days" min="0" max="<?php echo $SETTINGS['otv_expiration_period']; ?>" value="<?php echo $SETTINGS['otv_expiration_period']; ?>">
                             </div>
                         </div>
 
@@ -722,13 +722,13 @@ if ((int) $session_user_admin === 1) {
 
                         <div class="form-group col-2">
                             <label for="form-item-otv-subdomain" class="infotip" title="<?php
-                                echo isset($SETTINGS['otv_subdomain']) === true && empty($SETTINGS['otv_subdomain']) === false ? '' : $lang->get('feature_disabled_by_administrator'); ?>">
+                                                                                        echo isset($SETTINGS['otv_subdomain']) === true && empty($SETTINGS['otv_subdomain']) === false ? '' : $lang->get('feature_disabled_by_administrator'); ?>">
                                 <i class="fa-solid fa-globe mr-2"></i><?php echo $lang->get('shared_globaly'); ?>
                             </label>
                             <div class="input-group mb-3">
                                 <div class="form-check mb-3 icheck-blue">
                                     <input type="checkbox" class="form-check-input form-item-control flat-blue infotip" id="form-item-otv-subdomain" <?php
-                                        echo isset($SETTINGS['otv_subdomain']) === true && empty($SETTINGS['otv_subdomain']) === false ? ' enabled' : ' disabled'; ?> data-change-ongoing="">
+                                                                                                                                                        echo isset($SETTINGS['otv_subdomain']) === true && empty($SETTINGS['otv_subdomain']) === false ? ' enabled' : ' disabled'; ?> data-change-ongoing="">
                                 </div>
                             </div>
                         </div>
@@ -806,7 +806,7 @@ if ((int) $session_user_admin === 1) {
                         <div class="form-group">
                             <label><?php echo $lang->get('folder_creation_rights_strategy'); ?></label>
                             <select class="form-control form-folder-control select2" style="width:100%;" id="form-folder-add-rights" required>
-                                <option value="folder_creation_rights_as_user_groups"><?php echo $lang->get('folder_creation_rights_as_user_groups').' ('.$lang->get('by_default').')'; ?></option>
+                                <option value="folder_creation_rights_as_user_groups"><?php echo $lang->get('folder_creation_rights_as_user_groups') . ' (' . $lang->get('by_default') . ')'; ?></option>
                                 <option value="folder_creation_rights_as_folder_groups"><?php echo $lang->get('folder_creation_rights_as_folder_groups'); ?></option>
                             </select>
                         </div>
@@ -815,14 +815,14 @@ if ((int) $session_user_admin === 1) {
                             <label><?php echo $lang->get('icon'); ?></label>
                             <input type="text" class="form-control form-folder-control" id="form-folder-add-icon">
                             <small class='form-text text-muted'>
-                                <?php echo $lang->get('fontawesome_icon_tip'); ?><a href="<?php echo FONTAWESOME_URL;?>" target="_blank"><i class="fa-solid fa-external-link-alt ml-1"></i></a>
+                                <?php echo $lang->get('fontawesome_icon_tip'); ?><a href="<?php echo FONTAWESOME_URL; ?>" target="_blank"><i class="fa-solid fa-external-link-alt ml-1"></i></a>
                             </small>
                         </div>
                         <div class="form-group">
                             <label><?php echo $lang->get('icon_on_selection'); ?></label>
                             <input type="text" class="form-control form-folder-control" id="form-folder-add-icon-selected">
                             <small class='form-text text-muted'>
-                                <?php echo $lang->get('fontawesome_icon_tip'); ?><a href="<?php echo FONTAWESOME_URL;?>" target="_blank"><i class="fa-solid fa-external-link-alt ml-1"></i></a>
+                                <?php echo $lang->get('fontawesome_icon_tip'); ?><a href="<?php echo FONTAWESOME_URL; ?>" target="_blank"><i class="fa-solid fa-external-link-alt ml-1"></i></a>
                             </small>
                         </div>
                     </div>
@@ -888,11 +888,11 @@ if ((int) $session_user_admin === 1) {
                         <div class="input-group input-group-sm">
                             <input type="checkbox" class="flat-blue ml-2" id="form-folder-copy-sub-directories">
                             <label for="form-folder-copy-sub-directories" class="ml-2"><?php echo $lang->get('copy_sub_directories'); ?></label>
-                        </div>    
+                        </div>
                         <div class="input-group input-group-sm">
                             <input type="checkbox" class="flat-blue ml-2" id="form-folder-copy-items">
                             <label for="form-folder-copy-items" class="ml-2"><?php echo $lang->get('copy_items'); ?></label>
-                        </div> 
+                        </div>
                     </div>
                 </div>
                 <div class="card-footer">
@@ -920,37 +920,37 @@ if ((int) $session_user_admin === 1) {
 
 
     <div class="hidden" id="add_history_element">
-            <div class="alert alert-info">
-                <h5><i class="icon fa fa-info mr-3"></i><?php echo $lang->get('information'); ?></h5>
-                <?php echo $lang->get('info_about_history_insertion'); ?>
-            </div>
-            <div class="row">
-                <div class="col-12 input-group mb-3">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text"><?php echo $lang->get('label'); ?></span>
-                    </div>
-                    <input id="add-history-label" type="text" class="form-control form-item-control history" data-field-name="history-label">
+        <div class="alert alert-info">
+            <h5><i class="icon fa fa-info mr-3"></i><?php echo $lang->get('information'); ?></h5>
+            <?php echo $lang->get('info_about_history_insertion'); ?>
+        </div>
+        <div class="row">
+            <div class="col-12 input-group mb-3">
+                <div class="input-group-prepend">
+                    <span class="input-group-text"><?php echo $lang->get('label'); ?></span>
                 </div>
+                <input id="add-history-label" type="text" class="form-control form-item-control history" data-field-name="history-label">
             </div>
-            <div class="row">
-                <div class="col-6 input-group date inline">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text">
-                            <i class="fa-solid fa-calendar"></i>
-                        </span>
-                    </div>
-                    <input type="text" class="form-control float-right form-item-control datepicker history" id="add-history-date" data-field-name="history-date">
+        </div>
+        <div class="row">
+            <div class="col-6 input-group date inline">
+                <div class="input-group-prepend">
+                    <span class="input-group-text">
+                        <i class="fa-solid fa-calendar"></i>
+                    </span>
                 </div>
-                <div class="col-6 input-group time inline">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text">
-                            <i class="fa-solid fa-clock"></i>
-                        </span>
-                    </div>
-                    <input type="time" step="2" class="form-control float-right form-item-control timepicker history" id="add-history-time" data-field-name="history-time">
-                </div>
+                <input type="text" class="form-control float-right form-item-control datepicker history" id="add-history-date" data-field-name="history-date">
             </div>
-            <!--<div class="row col-12 mt-3">
+            <div class="col-6 input-group time inline">
+                <div class="input-group-prepend">
+                    <span class="input-group-text">
+                        <i class="fa-solid fa-clock"></i>
+                    </span>
+                </div>
+                <input type="time" step="2" class="form-control float-right form-item-control timepicker history" id="add-history-time" data-field-name="history-time">
+            </div>
+        </div>
+        <!--<div class="row col-12 mt-3">
                 <button type="button" class="btn btn-default mr-2" id="form-item-history-insert" data-action=""><i class="fa-solid fa-broom mr-2"></i><?php echo $lang->get('history_insert_entry'); ?></button>
                 <button type="button" class="btn btn-default" id="form-item-history-clear" data-action=""><i class="fa-solid fa-broom mr-2"></i><?php echo $lang->get('clear_form'); ?></button>
             </div>-->
@@ -981,23 +981,30 @@ if ((int) $session_user_admin === 1) {
                                     <a class="dropdown-item tp-action" href="#" data-folder-action="edit"><i class="fa-regular fa-edit fa-fw mr-2"></i><?php echo $lang->get('edit'); ?></a>
                                     <a class="dropdown-item tp-action" href="#" data-folder-action="copy"><i class="fa-regular fa-copy fa-fw mr-2"></i><?php echo $lang->get('copy'); ?></a>
                                     <a class="dropdown-item tp-action" href="#" data-folder-action="delete"><i class="fa-regular fa-trash-alt fa-fw mr-2"></i><?php echo $lang->get('delete'); ?></a>
-                                    <div class="dropdown-divider"></div>
-                                    <a class="dropdown-item tp-action" href="#" data-folder-action="">
-                                        <div class="input-group input-group-sm">
-                                            <input type="text" class="form-control" placeholder="<?php echo $lang->get('find'); ?>" id="jstree_search">
-                                            <div class="input-group-append">
-                                                <div class="btn btn-primary">
-                                                    <i class="fa-solid fa-search"></i>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </a>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="card-body p-0">
+                    <div class="p-2 border-bottom" style="position: sticky; top: 0; z-index: 5; background-color: #f8f9fa;">
+                        <form id="folder-search-form" class="mb-0">
+                            <div class="input-group input-group-sm">
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    id="jstree_search"
+                                    minlength="6"
+                                    placeholder="<?php echo $lang->get('find'); ?> (min 6)"
+                                    autocomplete="off">
+                                <div class="input-group-append">
+                                    <button type="submit" class="btn btn-info" id="folder-search-submit">
+                                        <i class="fa-solid fa-search mr-1"></i><?php echo $lang->get('find'); ?>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
                     <!-- FOLDERS PLACE -->
                     <div id="jstree" style="overflow:auto;"></div>
                 </div>
@@ -1062,7 +1069,9 @@ if ((int) $session_user_admin === 1) {
                     <div class="table-responsive">
                         <table class="table table-sm table-hover table-striped hidden" id="table_teampass_subfolders_list" style="width:100%;">
                             <tbody id="teampass_subfolders_list">
-                                <tr><td colspan="100%" class="text-center"><i class="fa-solid fa-spinner fa-spin fa-2x"></i></td></tr>
+                                <tr>
+                                    <td colspan="100%" class="text-center"><i class="fa-solid fa-spinner fa-spin fa-2x"></i></td>
+                                </tr>
                             </tbody>
                         </table>
 
@@ -1089,19 +1098,19 @@ if ((int) $session_user_admin === 1) {
         <!-- DELETE ITEMS CONFIRM -->
         <div class="modal fade" tabindex="-1" role="dialog" aria-hidden="true" id="items-delete-user-confirm">
             <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                <h4 class="modal-title"><?php echo $lang->get('please_confirm_deletion'); ?></h4>
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4 class="modal-title"><?php echo $lang->get('please_confirm_deletion'); ?></h4>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" id="modal-btn-items-delete-launch" data-id=""><?php echo $lang->get('yes'); ?></button>
+                        <button type="button" class="btn btn-default" id="modal-btn-items-delete-cancel"><?php echo $lang->get('cancel'); ?></button>
+                    </div>
                 </div>
-                <div class="modal-footer">
-                <button type="button" class="btn btn-primary" id="modal-btn-items-delete-launch" data-id=""><?php echo $lang->get('yes'); ?></button>
-                <button type="button" class="btn btn-default" id="modal-btn-items-delete-cancel"><?php echo $lang->get('cancel'); ?></button>
-                </div>
-            </div>
             </div>
         </div>
 
-        
+
         <div id="items-details-container" class="col-md-5 overflow-auto hidden">
             <!-- ITEM DETAILS -->
             <div class="row item-details-card item-details-card-menu">
@@ -1154,7 +1163,7 @@ if ((int) $session_user_admin === 1) {
                                             isset($SETTINGS['enable_server_password_change']) === true
                                             && (int) $SETTINGS['enable_server_password_change'] === 1
                                         ) {
-                                            ?>
+                                        ?>
                                             <li class="nav-item">
                                                 <a class="text-navy tp-action ml-3" href="#" data-item-action="server"><i class="fa-solid fa-server mr-1"></i><small><?php echo $lang->get('server'); ?></small></a>
                                             </li>
@@ -1164,7 +1173,7 @@ if ((int) $session_user_admin === 1) {
                                             isset($SETTINGS['otv_is_enabled']) === true
                                             && (int) $SETTINGS['otv_is_enabled'] === 1
                                         ) {
-                                            ?>
+                                        ?>
                                             <li class="nav-item">
                                                 <a class="text-navy tp-action ml-3" href="#" data-item-action="otv"><i class="fab fa-slideshare mr-1"></i><small><?php echo $lang->get('one_time_view'); ?></small></a>
                                             </li>
@@ -1196,7 +1205,7 @@ if ((int) $session_user_admin === 1) {
                                         <i class="fa-regular fa-copy"></i>
                                     </button>
                                     <button type="button" class="float-right btn btn-secondary btn-sm mr-1 hidden" id="card-item-password-history-button">
-                                    <i class="fa-solid fa-clock-rotate-left"></i>
+                                        <i class="fa-solid fa-clock-rotate-left"></i>
                                     </button>
                                     <button type="button" class="float-right btn btn-secondary btn-sm mr-1" id="card-item-pwd-toggle-button">
                                         <i class="fa-regular fa-eye pwd-toggle-icon"></i>
@@ -1270,7 +1279,7 @@ if ((int) $session_user_admin === 1) {
                 isset($SETTINGS['item_extra_fields']) === true
                 && (int) $SETTINGS['item_extra_fields'] === 1
             ) {
-                ?>
+            ?>
                 <div class="row hidden item-details-card" id="item-details-card-categories">
                     <div class="col-12">
                         <div class="card card-default">
@@ -1283,14 +1292,14 @@ if ((int) $session_user_admin === 1) {
                             <!-- /.card-header -->
                             <div class="card-body collapse show" id="card-item-fields">
                                 <?php
-                                    foreach ($session_item_fields as $elem) {
-                                        echo '
+                                foreach ($session_item_fields as $elem) {
+                                    echo '
                                 <div class="callout callout-info card-item-category hidden" id="card-item-category-' . $elem['id'] . '">
                                     <h5>' . $elem['title'] . '</h5>
                                     <p>
                                         <ul class="list-group list-group-unbordered mb-3">';
-                                        foreach ($elem['fields'] as $field) {
-                                            echo '
+                                    foreach ($elem['fields'] as $field) {
+                                        echo '
                                             <li class="list-group-item card-item-field hidden" id="card-item-field-' . $field['id'] . '">
                                                 <span id="card-item-field-title-' . $field['id'] . '"><b>' . $field['title'] . '</b></span>
                                                 <button type="button" class="float-right btn btn-secondary btn-sm ml-1 btn-copy-clipboard-clear"  data-clipboard-target="card-item-field-value-' . $field['id'] . '">
@@ -1301,12 +1310,12 @@ if ((int) $session_user_admin === 1) {
                                                 </button>
                                                 <span class="card-item-field-value float-right ml-1" id="card-item-field-value-' . $field['id'] . '"></span>
                                             </li>';
-                                        }
-                                        echo '
+                                    }
+                                    echo '
                                         </ul>
                                     </p>
                                 </div>';
-                                    } ?>
+                                } ?>
                                 <div class="hidden no-item-fields"><?php echo $lang->get('no_custom_fields'); ?></div>
                             </div>
                             <!-- /.card-body -->
@@ -1362,7 +1371,7 @@ if ((int) $session_user_admin === 1) {
 
             <!-- SERVER UPDATE --><?php
                                     if (DEBUG === true) {
-                                        ?>
+                                    ?>
                 <div class="row form-item-server form-item-action">
                     <div class="col-12">
                         <div class="card card-primary">
@@ -1440,18 +1449,18 @@ if ((int) $session_user_admin === 1) {
                     </div>
                 </div>
             <?php
-                }
+                                    }
             ?>
 
             <!-- Bottom bar -->
             <div class="row item-details-card">
                 <div class="col-12">
                     <div class="card">
-                            <div class="card-footer">
-                                <button type="button" class="btn btn-secondary but-navigate-item but-prev-item hidden" data-prev-item-id=""></button>
-                                <button type="button" class="btn btn-secondary but-navigate-item but-next-item hidden" data-next-item-id=""></button>
-                                <button type="button" class="btn btn-info float-right but-back-to-list"><?php echo $lang->get('close'); ?></button>
-                            </div>
+                        <div class="card-footer">
+                            <button type="button" class="btn btn-secondary but-navigate-item but-prev-item hidden" data-prev-item-id=""></button>
+                            <button type="button" class="btn btn-secondary but-navigate-item but-next-item hidden" data-next-item-id=""></button>
+                            <button type="button" class="btn btn-info float-right but-back-to-list"><?php echo $lang->get('close'); ?></button>
+                        </div>
                     </div>
                 </div>
             </div>
