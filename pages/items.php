@@ -972,7 +972,7 @@ if ((int) $session_user_admin === 1) {
                                     <i class="fa-solid fa-bars"></i>
                                     <span class="caret"></span>
                                 </button>
-                                <div class="dropdown-menu">
+                                <div class="dropdown-menu dropdown-menu-right">
                                     <a class="dropdown-item tp-action" href="#" data-folder-action="refresh"><i class="fa-solid fa-sync-alt fa-fw mr-2"></i><?php echo $lang->get('refresh'); ?></a>
                                     <a class="dropdown-item tp-action" href="#" data-folder-action="expand"><i class="fa-solid fa-expand fa-fw mr-2"></i><?php echo $lang->get('expand'); ?></a>
                                     <a class="dropdown-item tp-action" href="#" data-folder-action="collapse"><i class="fa-solid fa-compress fa-fw mr-2"></i><?php echo $lang->get('collapse'); ?></a>
@@ -1079,8 +1079,8 @@ if ((int) $session_user_admin === 1) {
                             <tbody id="teampass_items_list"></tbody>
                         </table>
                         <!-- /.table -->
-                        <div class="form-group row justify-content-md-center m-0" id="info_teampass_items_list">
-                            <div class="alert alert-info text-center col col-10" role="alert">
+                        <div class="form-group row justify-content-center m-0" id="info_teampass_items_list">
+                            <div class="alert alert-info text-center col-12 col-md-10 mx-auto" role="alert">
                                 <i class="fa-solid fa-info-circle mr-2"></i><?php echo $lang->get('please_select_a_folder'); ?></b>
                             </div>
                         </div>
