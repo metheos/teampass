@@ -151,6 +151,60 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         loadingToast = '',
         showCorruptedItemsInList = <?php echo ((int) ($session->get('user-admin') ?? 0) !== 1 && isset($SETTINGS['show_corrupted_items_in_list']) === true && (int) $SETTINGS['show_corrupted_items_in_list'] === 1) ? 'true' : 'false'; ?>;
 
+    const descriptionEditorToolbar = [
+        ['style', ['style']],
+        ['font', ['bold', 'italic', 'underline', 'strikethrough', 'clear']],
+        ['fontsize', ['fontsize']],
+        ['color', ['color']],
+        ['para', ['ul', 'ol', 'paragraph']],
+        ['insert', ['link', 'picture']],
+        ['view', ['codeview']]
+    ]
+
+    let isFormPasswordVisible = false
+
+    function isMobileViewport() {
+        return window.matchMedia('(max-width: 767.98px)').matches
+    }
+
+    function setFormPasswordVisibility(shouldShow) {
+        isFormPasswordVisible = shouldShow === true
+        $('#form-item-password').attr('type', isFormPasswordVisible ? 'text' : 'password')
+
+        const $icon = $('#item-button-password-show').find('i')
+        if (isFormPasswordVisible) {
+            $icon.removeClass('fa-low-vision').addClass('fa-eye-slash text-warning')
+        } else {
+            $icon.removeClass('fa-eye-slash text-warning').addClass('fa-low-vision')
+        }
+    }
+
+    function initDescriptionEditor(selector, onChangeCallback = null) {
+        const mobileView = isMobileViewport()
+        const callbacks = {}
+
+        callbacks.onPaste = function(e) {
+            if (mobileView === true) {
+                e.preventDefault()
+                const pastedText = ((e.originalEvent || e).clipboardData || window.clipboardData).getData('text/plain')
+                document.execCommand('insertText', false, pastedText)
+            }
+        }
+
+        if (typeof onChangeCallback === 'function') {
+            callbacks.onChange = onChangeCallback
+        }
+
+        $(selector).summernote({
+            toolbar: mobileView === true ? [] : descriptionEditorToolbar,
+            codeviewFilter: true,
+            codeviewIframeFilter: true,
+            disableDragAndDrop: true,
+            shortcuts: mobileView === false,
+            callbacks: callbacks,
+        })
+    }
+
     /**
      * Start edition lock heartbeat via AJAX.
      * Sends a renew_lock request every 60 seconds to keep the lock alive.
@@ -975,24 +1029,12 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 $('.form-item-control').val('');
                 // Show edition form
                 $('.form-item').removeClass('hidden');
+                setFormPasswordVisibility(false)
                 // Force update of simplepassmeter
                 $('#form-item-password').focus();
                 $('#form-item-label').focus();
                 // Prepare editor
-                $('#form-item-description').summernote({
-                    toolbar: [
-                        ['style', ['style']],
-                        ['font', ['bold', 'italic', 'underline', 'strikethrough', 'clear']],
-                        ['fontsize', ['fontsize']],
-                        ['color', ['color']],
-                        ['para', ['ul', 'ol', 'paragraph']],
-                        ['insert', ['link', 'picture']],
-                        //['height', ['height']],
-                        ['view', ['codeview']]
-                    ],
-                    codeviewFilter: true,
-                    codeviewIframeFilter: true
-                });
+                initDescriptionEditor('#form-item-description');
 
                 // Buttons more theme compliants
                 $('.btn-light').addClass('btn-secondary').removeClass('btn-light');
@@ -3093,17 +3135,12 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             }
         });
 
-    // Click to reaveal password
-    $('#item-button-password-show')
-        .mouseup(function() {
-            $('#form-item-password').attr('type', 'password');
-        })
-        .mousedown(function() {
-            // Allow $('#form-item .form-item-control').on('change') to be fired
-            $('#form-item .form-item-control').blur();
-            // Display cleartext password
-            $('#form-item-password').attr('type', 'text');
-        });
+    // Toggle password visibility in edit form (tap/click to show/hide)
+    $('#item-button-password-show').on('click', function() {
+        // Allow $('#form-item .form-item-control').on('change') to be fired
+        $('#form-item .form-item-control').blur()
+        setFormPasswordVisibility(!isFormPasswordVisible)
+    })
     $('.btn-no-click')
         .click(function(e) {
             e.preventDefault();
@@ -4131,6 +4168,8 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
      * @param {number}       itemId                     The item whose password to load.
      */
     function loadPasswordIntoEditForm(prefetchedPasswordPromise, itemId) {
+        setFormPasswordVisibility(false)
+
         // Clear the field and show the spinner (between input and buttons)
         $('#form-item-password')
             .val('')
@@ -4194,6 +4233,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 .removeClass('hidden');
             $('.form-item-copy, #form-item-password-options, .form-item-action, #folders-tree-card, .columns-position')
                 .addClass('hidden');
+            setFormPasswordVisibility(false)
 
             // Initial 'user did a change'
             userDidAChange = false;
@@ -6039,60 +6079,25 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     if (debugJavascript === true) {
                         console.log('>>>> create summernote');
                     }
-                    $('#form-item-description')
-                        .html(htmlDecode(data.description))
-                        .summernote({
-                            toolbar: [
-                                ['style', ['style']],
-                                ['font', ['bold', 'italic', 'underline', 'strikethrough', 'clear']],
-                                ['fontsize', ['fontsize']],
-                                ['color', ['color']],
-                                ['para', ['ul', 'ol', 'paragraph']],
-                                ['insert', ['link', 'picture']],
-                                //['height', ['height']],
-                                ['view', ['codeview']]
-                            ],
-                            codeviewFilter: true,
-                            codeviewIframeFilter: true,
-                            callbacks: {
-                                onChange: function(contents, $editable) {
-                                    if (debugJavascript === true) console.log('Editor onChange:' + userDidAChange + " - " + requestRunning);
-                                    if (userDidAChange === false && requestRunning === false) {
-                                        if (debugJavascript === true) console.log('onChange:', contents, $editable);
-                                        userDidAChange = true;
-                                        if (debugJavascript === true) console.log('User did a change on #form-item-description > ' + userDidAChange);
-                                        //$('#form-item-description').attr('data-change-ongoing', true);;
-                                    }
-                                }
-                            }
-                        })
-                    //.summernote('editor.insertText', data.description);
+                    $('#form-item-description').html(htmlDecode(data.description))
+                    initDescriptionEditor('#form-item-description', function(contents, $editable) {
+                        if (debugJavascript === true) console.log('Editor onChange:' + userDidAChange + " - " + requestRunning);
+                        if (userDidAChange === false && requestRunning === false) {
+                            if (debugJavascript === true) console.log('onChange:', contents, $editable);
+                            userDidAChange = true;
+                            if (debugJavascript === true) console.log('User did a change on #form-item-description > ' + userDidAChange);
+                        }
+                    })
+                    // .summernote('editor.insertText', data.description);
 
-                    $('#form-item-suggestion-description')
-                        .html(htmlDecode(data.description))
-                        .summernote({
-                            toolbar: [
-                                ['style', ['style']],
-                                ['font', ['bold', 'italic', 'underline', 'strikethrough', 'clear']],
-                                ['fontsize', ['fontsize']],
-                                ['color', ['color']],
-                                ['para', ['ul', 'ol', 'paragraph']],
-                                ['insert', ['link', 'picture']],
-                                //['height', ['height']],
-                                ['view', ['codeview']]
-                            ],
-                            codeviewFilter: true,
-                            codeviewIframeFilter: true,
-                            callbacks: {
-                                onChange: function(contents, $editable) {
-                                    if (userDidAChange === false && requestRunning === false) {
-                                        if (debugJavascript === true) console.log('onChange:', contents, $editable);
-                                        userDidAChange = true;
-                                        if (debugJavascript === true) console.log('User did a change on #form-item-suggestion-description > ' + userDidAChange);
-                                    }
-                                }
-                            }
-                        });
+                    $('#form-item-suggestion-description').html(htmlDecode(data.description))
+                    initDescriptionEditor('#form-item-suggestion-description', function(contents, $editable) {
+                        if (userDidAChange === false && requestRunning === false) {
+                            if (debugJavascript === true) console.log('onChange:', contents, $editable);
+                            userDidAChange = true;
+                            if (debugJavascript === true) console.log('User did a change on #form-item-suggestion-description > ' + userDidAChange);
+                        }
+                    });
 
                     // Buttons more theme compliants
                     $('.btn-light').addClass('btn-secondary').removeClass('btn-light');

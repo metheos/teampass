@@ -90,6 +90,79 @@ if ((int) $session_user_admin === 1) {
 
 ?>
 
+<style>
+    #form-item-password-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    #form-item-password-actions .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #form-item-password-actions .mobile-password-label {
+        display: none;
+    }
+
+    #form-item-upload-zone {
+        align-items: stretch;
+    }
+
+    #form-item-upload-actions .btn {
+        min-width: 140px;
+    }
+
+    #form-item-upload-pickfilesList {
+        min-height: 120px;
+        margin-bottom: 0;
+        border: 1px solid #d8dee4;
+        border-radius: 0.5rem;
+        background: #f8f9fb;
+    }
+
+    @media (max-width: 767.98px) {
+        #form-item-password-actions {
+            margin-bottom: 0.5rem;
+        }
+
+        #form-item-password-actions .btn {
+            flex: 1 1 calc(50% - 0.5rem);
+            justify-content: flex-start;
+            white-space: normal;
+            text-align: left;
+            font-size: 0.82rem;
+            line-height: 1.2;
+        }
+
+        #form-item-password-actions .mobile-password-label {
+            display: inline;
+            margin-left: 0.4rem;
+            font-weight: 600;
+        }
+
+        #form-item-upload-actions {
+            flex-direction: column;
+        }
+
+        #form-item-upload-actions .btn {
+            width: 100%;
+            margin-right: 0;
+        }
+
+        #form-item-upload-pickfilesList {
+            margin-top: 0.75rem;
+            min-height: 90px;
+        }
+
+        #form-item .note-toolbar {
+            display: none;
+        }
+    }
+</style>
+
 <!-- Content Header (Page header) -->
 <div class="content-header">
     <div class="container-fluid">
@@ -180,6 +253,7 @@ if ((int) $session_user_admin === 1) {
                                 </div>
                                 <!-- DESCRIPTION -->
                                 <div class="mb-3">
+                                    <label for="form-item-description" class="font-weight-bold mb-2"><?php echo $lang->get('description'); ?></label>
                                     <div id="form-item-description" class="form-item-control w-100 clear-me-html purify purifyHtml" data-field-name="description" data-change-ongoing=""></div>
                                 </div>
                                 <!-- LOGIN -->
@@ -190,6 +264,13 @@ if ((int) $session_user_admin === 1) {
                                     <input id="form-item-login" type="text" class="form-control form-item-control purify" data-field-name="login" data-change-ongoing="">
                                 </div>
                                 <!-- PASSWORD -->
+                                <div class="mb-2" id="form-item-password-actions">
+                                    <button class="btn btn-secondary btn-no-click infotip password-generate" id="item-button-password-generate" title="<?php echo $lang->get('pw_generate'); ?>" data-id="form-item-password"><i class="fa-solid fa-random"></i><span class="mobile-password-label"><?php echo $lang->get('pw_generate'); ?></span></button>
+                                    <button class="btn btn-secondary btn-no-click infotip" id="item-button-password-showOptions" title="<?php echo $lang->get('options'); ?>"><i class="fa-solid fa-sliders-h"></i><span class="mobile-password-label"><?php echo $lang->get('options'); ?></span></button>
+                                    <button class="btn btn-info btn-no-click infotip" id="item-button-passphrase-generate" title="<?php echo $lang->get('passphrase_generate'); ?>" data-id="form-item-password"><i class="fa-solid fa-comment-dots"></i><span class="mobile-password-label"><?php echo $lang->get('passphrase_generate'); ?></span></button>
+                                    <button class="btn btn-info btn-no-click infotip" id="item-button-passphrase-showOptions" title="<?php echo $lang->get('passphrase_options'); ?>"><i class="fa-solid fa-list-ul"></i><span class="mobile-password-label"><?php echo $lang->get('passphrase_options'); ?></span></button>
+                                    <button class="btn btn-secondary btn-no-click infotip" id="item-button-password-show" title="<?php echo $lang->get('mask_pw'); ?>"><i class="fa-solid fa-low-vision"></i><span class="mobile-password-label">Show/Hide</span></button>
+                                </div>
                                 <div class="input-group mb-2">
                                     <div class="input-group-prepend">
                                         <span class="input-group-text"><?php echo $lang->get('password'); ?></span>
@@ -197,14 +278,6 @@ if ((int) $session_user_admin === 1) {
                                     <input id="form-item-password" type="password" class="form-control form-item-control" placeholder="<?php echo $lang->get('password'); ?>" data-field-name="pwd" data-change-ongoing="">
                                     <div class="input-group-append">
                                         <span class="input-group-text hidden" id="form-item-password-loader"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
-                                        <!-- Password generator group -->
-                                        <button class="btn btn-secondary btn-no-click infotip password-generate" id="item-button-password-generate" title="<?php echo $lang->get('pw_generate'); ?>" data-id="form-item-password"><i class="fa-solid fa-random"></i></button>
-                                        <button class="btn btn-secondary btn-no-click infotip" id="item-button-password-showOptions" title="<?php echo $lang->get('options'); ?>"><i class="fa-solid fa-sliders-h"></i></button>
-                                        <!-- Passphrase generator group -->
-                                        <button class="btn btn-info btn-no-click infotip" id="item-button-passphrase-generate" title="<?php echo $lang->get('passphrase_generate'); ?>" data-id="form-item-password"><i class="fa-solid fa-comment-dots"></i></button>
-                                        <button class="btn btn-info btn-no-click infotip" id="item-button-passphrase-showOptions" title="<?php echo $lang->get('passphrase_options'); ?>"><i class="fa-solid fa-list-ul"></i></button>
-                                        <!-- Show/hide password -->
-                                        <button class="btn btn-secondary btn-no-click infotip" id="item-button-password-show" title="<?php echo $lang->get('mask_pw'); ?>"><i class="fa-solid fa-low-vision"></i></button>
                                     </div>
                                 </div>
                                 <div class="container-fluid mb-0">
@@ -469,19 +542,21 @@ if ((int) $session_user_admin === 1) {
                                     <!-- /.card-header -->
                                     <div class="card-body">
                                         <div class="row" id="form-item-upload-zone">
-                                            <div class="col-6">
-                                                <a class="btn btn-app text-capitalize" id="form-item-attach-pickfiles">
-                                                    <i class="fa-solid fa-search mr-1"></i><?php echo $lang->get('select'); ?>
-                                                </a>
-                                                <a class="btn btn-app" id="form-item-upload-pickfiles">
-                                                    <i class="fa-solid fa-upload mr-1"></i><?php echo $lang->get('start_upload'); ?>
-                                                </a>
+                                            <div class="col-12 col-lg-5" id="form-item-upload-actions-wrapper">
+                                                <div class="d-flex" id="form-item-upload-actions">
+                                                    <button type="button" class="btn btn-outline-primary mr-2 mb-2 text-capitalize" id="form-item-attach-pickfiles">
+                                                        <i class="fa-solid fa-search mr-1"></i><?php echo $lang->get('select'); ?>
+                                                    </button>
+                                                    <button type="button" class="btn btn-primary mb-2" id="form-item-upload-pickfiles">
+                                                        <i class="fa-solid fa-upload mr-1"></i><?php echo $lang->get('start_upload'); ?>
+                                                    </button>
+                                                </div>
                                                 <input type="hidden" id="form-item-hidden-pickFilesNumber" value="0" />
                                                 <small class="form-text text-muted">
                                                     <?php echo $lang->get('add_files_and_click_start'); ?>
                                                 </small>
                                             </div>
-                                            <div class="col-6">
+                                            <div class="col-12 col-lg-7">
                                                 <div class="callout callout-info hidden clear-me-html" id="form-item-upload-pickfilesList"></div>
                                             </div>
                                         </div>
