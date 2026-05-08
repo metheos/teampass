@@ -22,7 +22,7 @@ declare(strict_types=1);
  * Certain components of this file may be under different licenses. For
  * details, see the `licenses` directory or individual file headers.
  * ---
-  * @file      search.js.php
+ * @file      search.js.php
  * @author    Nils Laumaillé (nils@teampass.net)
  * @copyright 2009-2026 Teampass.net
  * @license   GPL-3.0
@@ -36,7 +36,7 @@ use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 use TeampassClasses\Language\Language;
 
 // Load functions
-require_once __DIR__.'/../sources/main.functions.php';
+require_once __DIR__ . '/../sources/main.functions.php';
 
 // init
 loadClasses();
@@ -86,6 +86,16 @@ $var['hidden_asterisk'] = '<i class="fas fa-asterisk mr-2"></i><i class="fas fa-
         loginClipboard,
         urlClipboard;
 
+    var mobileColumnLabels = [
+        '',
+        '<?php echo $lang->get('label'); ?>',
+        '<?php echo $lang->get('login'); ?>',
+        '<?php echo $lang->get('description'); ?>',
+        '<?php echo $lang->get('tags'); ?>',
+        '<?php echo $lang->get('url'); ?>',
+        '<?php echo $lang->get('group'); ?>'
+    ];
+
     //Launch the datatables pluggin
     var oTable = $("#search-results-items").DataTable({
         "paging": true,
@@ -101,20 +111,20 @@ $var['hidden_asterisk'] = '<i class="fas fa-asterisk mr-2"></i><i class="fas fa-
         ],
         "processing": true,
         "serverSide": true,
-        "responsive": true,
+        "responsive": false,
         "select": false,
         "stateSave": true,
-        "autoWidth": true,
+        "autoWidth": false,
         "ajax": {
             url: "<?php echo $SETTINGS['cpassman_url']; ?>/sources/find.queries.php",
             type: 'GET',
-            "dataSrc": function ( json ) {
-                for ( var i=0, ien=json.data.length ; i<ien ; i++ ) {
-                    json.data[i][1]=atob(json.data[i][1]).utf8Decode();
-                    json.data[i][2]=atob(json.data[i][2]).utf8Decode();
-                    json.data[i][3]=atob(json.data[i][3]).utf8Decode();
-                    json.data[i][4]=atob(json.data[i][4]).utf8Decode();
-                    json.data[i][6]=atob(json.data[i][6]).utf8Decode();
+            "dataSrc": function(json) {
+                for (var i = 0, ien = json.data.length; i < ien; i++) {
+                    json.data[i][1] = atob(json.data[i][1]).utf8Decode();
+                    json.data[i][2] = atob(json.data[i][2]).utf8Decode();
+                    json.data[i][3] = atob(json.data[i][3]).utf8Decode();
+                    json.data[i][4] = atob(json.data[i][4]).utf8Decode();
+                    json.data[i][6] = atob(json.data[i][6]).utf8Decode();
                 }
                 return (json.data);
             }
@@ -153,6 +163,14 @@ $var['hidden_asterisk'] = '<i class="fas fa-asterisk mr-2"></i><i class="fas fa-
             //iCheck for checkbox and radio inputs
             $('#search-results-items input[type="checkbox"]').iCheck({
                 checkboxClass: 'icheckbox_flat-blue'
+            });
+        },
+        "createdRow": function(row) {
+            $('td', row).each(function(index) {
+                $(this).attr('data-label', mobileColumnLabels[index] || '');
+                if (index === 0) {
+                    $(this).addClass('mobile-row-action');
+                }
             });
         }
     });
@@ -322,7 +340,7 @@ $var['hidden_asterisk'] = '<i class="fas fa-asterisk mr-2"></i><i class="fas fa-
                                 () => {
                                     const clipboardStatus = JSON.parse(localStorage.getItem('clipboardStatus'));
                                     if (clipboardStatus.status === 'unsafe') {
-                                        return;                                        
+                                        return;
                                     }
                                     toastr.success('<?php echo $lang->get("clipboard_cleared"); ?>', '', {
                                         timeOut: 2000,
@@ -342,7 +360,7 @@ $var['hidden_asterisk'] = '<i class="fas fa-asterisk mr-2"></i><i class="fas fa-
                         });
                     }
                 });
-                
+
                 // Click handler to copy the login to the clipboard if it exists
                 if (document.getElementById('btn-copy-login')) {
                     document.getElementById('btn-copy-login').addEventListener('click', async function() {
@@ -439,15 +457,15 @@ $var['hidden_asterisk'] = '<i class="fas fa-asterisk mr-2"></i><i class="fas fa-
 
     const showPwdContinuous = function showPwdContinuous(elem_id) {
         const itemId = elem_id.split('_')[1];
-        if (mouseStillDown === true 
-            && !$('#pwd-show_' + itemId).hasClass('pwd-shown')
+        if (mouseStillDown === true &&
+            !$('#pwd-show_' + itemId).hasClass('pwd-shown')
         ) {
             getItemPassword(
                 'at_password_shown',
                 'item_id',
                 itemId
             ).then(item_pwd => {
-                if (item_pwd) {                    
+                if (item_pwd) {
                     $('#pwd-show_' + itemId).text(item_pwd);
                     $('#pwd-show_' + itemId).addClass('pwd-shown');
 
@@ -455,7 +473,7 @@ $var['hidden_asterisk'] = '<i class="fas fa-asterisk mr-2"></i><i class="fas fa-
                     setTimeout('showPwdContinuous("pwd-show_' + itemId + '")', 50);
                 }
             });
-        } else if(mouseStillDown !== true) {
+        } else if (mouseStillDown !== true) {
             $('#pwd-show_' + itemId)
                 .html('<?php echo $var['hidden_asterisk']; ?>')
                 .removeClass('pwd-shown');
@@ -468,14 +486,14 @@ $var['hidden_asterisk'] = '<i class="fas fa-asterisk mr-2"></i><i class="fas fa-
         const itemId = $(this).data('id');
         // Show the password if it is not already shown
         if ($(this).hasClass('pwd-shown') === false) {
-            $(this).addClass('pwd-shown');  // Set the class
+            $(this).addClass('pwd-shown'); // Set the class
 
             getItemPassword(
                 'at_password_shown',
                 'item_id',
                 itemId
             ).then(item_pwd => {
-                $(this).removeClass('pwd-shown');   // Reset the class
+                $(this).removeClass('pwd-shown'); // Reset the class
                 // Display the password if it exists
                 if (item_pwd) {
                     $('.pwd-show-spinner')

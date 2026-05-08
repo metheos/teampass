@@ -37,7 +37,7 @@ use TeampassClasses\PerformChecks\PerformChecks;
 use TeampassClasses\ConfigManager\ConfigManager;
 
 // Load functions
-require_once __DIR__.'/../sources/main.functions.php';
+require_once __DIR__ . '/../sources/main.functions.php';
 
 // init
 loadClasses('DB');
@@ -81,9 +81,71 @@ header('Content-type: text/html; charset=utf-8');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 
 // --------------------------------- //
- 
+
 
 ?>
+
+<style>
+    #search-results-items {
+        width: 100% !important;
+    }
+
+    @media (max-width: 767.98px) {
+        #search-results-items thead {
+            display: none;
+        }
+
+        #search-results-items tbody tr:not(.new-row):not(.child) {
+            display: block;
+            margin-bottom: 0.75rem;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            background-color: #fff;
+            overflow: hidden;
+        }
+
+        #search-results-items tbody tr:not(.new-row):not(.child) td {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border: 0;
+            border-bottom: 1px solid #f1f3f5;
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+
+        #search-results-items tbody tr:not(.new-row):not(.child) td:last-child {
+            border-bottom: 0;
+        }
+
+        #search-results-items tbody tr:not(.new-row):not(.child) td::before {
+            content: attr(data-label);
+            flex: 0 0 40%;
+            max-width: 40%;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        #search-results-items tbody tr:not(.new-row):not(.child) td.mobile-row-action {
+            justify-content: flex-end;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        #search-results-items tbody tr:not(.new-row):not(.child) td.mobile-row-action::before {
+            content: '';
+            display: none;
+        }
+
+        #search-results-items tbody tr.new-row td,
+        #search-results-items tbody tr.child td {
+            display: table-cell;
+        }
+    }
+</style>
 
 <!-- Content Header (Page header) -->
 <div class="content-header">
@@ -129,21 +191,23 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
                 </div>
                 <!-- /.card-header -->
                 <div class="card-body">
-                    <table id="search-results-items" class="table table-bordered table-striped" style="width:100%">
-                        <thead>
-                            <tr>
-                                <th></th>
-                                <th><?php echo $lang->get('label'); ?></th>
-                                <th><?php echo $lang->get('login'); ?></th>
-                                <th><?php echo $lang->get('description'); ?></th>
-                                <th><?php echo $lang->get('tags'); ?></th>
-                                <th><?php echo $lang->get('url'); ?></th>
-                                <th><?php echo $lang->get('group'); ?></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        </tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table id="search-results-items" class="table table-bordered table-striped" style="width:100%">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th><?php echo $lang->get('label'); ?></th>
+                                    <th><?php echo $lang->get('login'); ?></th>
+                                    <th><?php echo $lang->get('description'); ?></th>
+                                    <th><?php echo $lang->get('tags'); ?></th>
+                                    <th><?php echo $lang->get('url'); ?></th>
+                                    <th><?php echo $lang->get('group'); ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
