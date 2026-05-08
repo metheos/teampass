@@ -123,6 +123,14 @@ if ((int) $session_user_admin === 1) {
         background: #f8f9fb;
     }
 
+    #form-item-title {
+        margin-bottom: 0;
+    }
+
+    #form-item-title:empty {
+        display: none;
+    }
+
     @media (max-width: 767.98px) {
         #but_back_top_left {
             display: none;
@@ -238,7 +246,7 @@ if ((int) $session_user_admin === 1) {
                         </button>
                     </div>
 
-                    <h5 id="form-item-title" class="clear-me-html" style="min-height:23px;"></h5>
+                    <h5 id="form-item-title" class="clear-me-html"></h5>
 
                     <div class="card-tools">
                         <button type="button" class="btn btn-secondary btn-sm but-back" id="but_back_top_right">
