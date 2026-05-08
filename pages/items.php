@@ -958,6 +958,57 @@ if ((int) $session_user_admin === 1) {
 
 
     <div class="row h-25" id="folders-tree-card">
+        <style>
+            @media (max-width: 767.98px) {
+                #folders-tree-card {
+                    height: auto !important;
+                }
+
+                #folder-tree-container,
+                #items-list-container {
+                    flex: 0 0 100%;
+                    max-width: 100%;
+                }
+
+                #items-controls-row {
+                    display: flex;
+                    flex-wrap: nowrap;
+                    align-items: center;
+                }
+
+                #items-controls-left {
+                    display: flex;
+                    flex: 0 0 auto;
+                    align-items: center;
+                    gap: 0.25rem;
+                    min-width: 0;
+                }
+
+                #items-controls-left .btn-group {
+                    float: none !important;
+                }
+
+                #btn-new-item .btn {
+                    white-space: nowrap;
+                    padding: 0.25rem 0.45rem;
+                    font-size: 0.8rem;
+                }
+
+                #items-controls-right {
+                    flex: 1 1 auto;
+                    min-width: 0;
+                    padding-left: 0.5rem;
+                }
+
+                #items-controls-right .input-group {
+                    width: 100%;
+                }
+
+                #items-controls-right .form-control {
+                    min-width: 0;
+                }
+            }
+        </style>
         <div id="folder-tree-container" class="col-md-5 column-left">
             <div class="card card-info card-outline">
                 <div class="card-header">
@@ -1015,8 +1066,8 @@ if ((int) $session_user_admin === 1) {
             <div class="card card-primary card-outline" id="items-list-card">
                 <div class="card-header">
                     <div class="card-title w-100">
-                        <div class="row">
-                            <div class="col">
+                        <div class="row" id="items-controls-row">
+                            <div class="col-auto" id="items-controls-left">
                                 <div class="btn-group float-left">
                                     <button type="button" class="btn btn-primary btn-sm dropdown-toggle" data-toggle="dropdown">
                                         <i class="fa-solid fa-bars"></i>
@@ -1041,7 +1092,7 @@ if ((int) $session_user_admin === 1) {
                                     </button>
                                 </div>
                             </div>
-                            <div class="col text-right">
+                            <div class="col text-right" id="items-controls-right">
                                 <div class="input-group input-group-sm">
                                     <input type="text" class="form-control" placeholder="<?php echo $lang->get('find'); ?>" id="find_items">
                                     <div class="input-group-append">

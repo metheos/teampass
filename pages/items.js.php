@@ -411,6 +411,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         $('#jstree').one('refresh.jstree', function() {
             refreshTree('', false, true)
             $('#jstree').jstree('open_all')
+            adjustItemsLayoutHeights()
 
             store.update('teampassApplication', function(teampassApplication) {
                 teampassApplication.jstreeForceRefresh = 0
@@ -529,10 +530,41 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
     });
 
 
+    function adjustItemsLayoutHeights() {
+        const viewportHeight = $(window).height()
+        const isMobile = window.matchMedia('(max-width: 767.98px)').matches
+
+        if (isMobile === true) {
+            const resultCount = $('#jstree').find('.jstree-anchor').length
+            const minTreeHeight = 120
+            const baseTreeHeight = 100
+            const rowHeight = 34
+            const maxTreeHeight = Math.min(360, Math.floor(viewportHeight * 0.45))
+
+            let computedTreeHeight = baseTreeHeight + (resultCount * rowHeight)
+            if (resultCount === 0) {
+                computedTreeHeight = minTreeHeight
+            }
+            computedTreeHeight = Math.max(minTreeHeight, Math.min(computedTreeHeight, maxTreeHeight))
+
+            $('#jstree').css('height', computedTreeHeight + 'px')
+            $('#items-list-card .table-responsive').css('height', 'auto')
+            $('#items-details-container').css('height', 'auto')
+            return
+        }
+
+        const desktopHeight = viewportHeight - 270
+        $('#jstree').css('height', desktopHeight + 'px')
+        $('#items-list-card .table-responsive').css('height', desktopHeight + 'px')
+        $('#items-details-container').css('height', (desktopHeight + 59) + 'px')
+    }
+
+
     // Ensure correct height of folders tree
-    $('#jstree').height(screenHeight - 270);
-    $('.card-body .table-responsive').height(screenHeight - 270);
-    $('#items-details-container').height(screenHeight - 270 + 59); // 59 = tables header/borders
+    adjustItemsLayoutHeights()
+    $(window).on('resize', function() {
+        adjustItemsLayoutHeights()
+    })
 
     // Prepare iCheck format for checkboxes
     $('input[type="checkbox"].flat-blue, input[type="radio"].flat-blue').iCheck({
@@ -1742,8 +1774,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 folder_id: folderId,
                 context: context,
                 item_id: store.get('teampassItem') !== undefined && store.get('teampassItem').id !== undefined ?
-                    store.get('teampassItem').id :
-                    '',
+                    store.get('teampassItem').id : '',
                 key: '<?php echo $session->get('key'); ?>'
             }
         ).then(function(data) {
