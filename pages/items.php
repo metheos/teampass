@@ -124,6 +124,40 @@ if ((int) $session_user_admin === 1) {
     }
 
     @media (max-width: 767.98px) {
+        #but_back_top_left {
+            display: none;
+        }
+
+        #item-form-meta-card .card-header {
+            padding: 0.4rem 0.75rem;
+        }
+
+        #item-form-meta-card .card-body {
+            padding: 0.5rem 0.75rem;
+        }
+
+        #item-form-meta-card .item-meta-row {
+            margin-bottom: 0.25rem;
+        }
+
+        #item-form-meta-card .item-meta-row:last-child {
+            margin-bottom: 0;
+        }
+
+        #item-form-meta-card .item-meta-label {
+            font-size: 0.8rem;
+            margin-bottom: 0;
+        }
+
+        #item-form-meta-card .item-meta-label .fa-solid {
+            margin-right: 0.3rem !important;
+        }
+
+        #item-form-meta-card .item-meta-value {
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
         #form-item-password-actions {
             margin-bottom: 0.5rem;
         }
@@ -196,7 +230,7 @@ if ((int) $session_user_admin === 1) {
     <div class="row hidden form-item">
         <div class="col-12">
 
-            <div class="card text-center">
+            <div class="card text-center" id="item-form-meta-card">
                 <div class="card-header">
                     <div class="card-tools-left">
                         <button type="button" class="btn btn-secondary but-back" id="but_back_top_left">
@@ -213,15 +247,15 @@ if ((int) $session_user_admin === 1) {
                     </div>
                 </div>
                 <div class="card-body">
-                    <div>
-                        <label><i class="fa-solid fa-users mr-2"></i><?php echo $lang->get('visible_by'); ?></label>
-                        <span id="card-item-visibility" class="text-info font-weight-bold ml-2">
+                    <div class="item-meta-row">
+                        <label class="item-meta-label"><i class="fa-solid fa-users mr-2"></i><?php echo $lang->get('visible_by'); ?></label>
+                        <span id="card-item-visibility" class="item-meta-value text-info font-weight-bold ml-2">
                             <i class="fa-solid fa-ellipsis mr-2 fa-fade"></i>
                         </span>
                     </div>
-                    <div>
-                        <label><i class="fa-solid fa-key mr-2"></i><?php echo $lang->get('complex_asked'); ?></label>
-                        <span id="card-item-minimum-complexity" class="text-info font-weight-bold ml-2">
+                    <div class="item-meta-row">
+                        <label class="item-meta-label"><i class="fa-solid fa-key mr-2"></i><?php echo $lang->get('complex_asked'); ?></label>
+                        <span id="card-item-minimum-complexity" class="item-meta-value text-info font-weight-bold ml-2">
                             <i class="fa-solid fa-ellipsis mr-2 fa-fade"></i>
                         </span>
                     </div>
