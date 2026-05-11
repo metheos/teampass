@@ -4407,6 +4407,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         var data = {
             'force_refresh_cache': forceRefreshCache,
             'include_paths': false,
+            'search_term': activeFolderSearchTerm,
             'folders_version': foldersVersion,
         }
         if (debugJavascript === true) {
@@ -8203,7 +8204,8 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     type: 'refresh_visible_folders',
                     data: prepareExchangedData(JSON.stringify({
                         'force_refresh_cache': true,
-                        'include_paths': false
+                        'include_paths': false,
+                        'search_term': activeFolderSearchTerm
                     }), 'encode', '<?php echo $session->get('key'); ?>'),
                     key: '<?php echo $session->get('key'); ?>'
                 },

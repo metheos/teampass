@@ -6593,9 +6593,17 @@ switch ($inputData['type']) {
         );
         $includeFullPath = isset($dataReceived['include_paths'])
             && filter_var($dataReceived['include_paths'], FILTER_VALIDATE_BOOLEAN);
+        $searchTerm = isset($dataReceived['search_term'])
+            ? trim((string) filter_var($dataReceived['search_term'], FILTER_SANITIZE_FULL_SPECIAL_CHARS))
+            : '';
+        $isSearchMode = $searchTerm !== '';
 
         // do we have a cache to be used?
-        if (isset($dataReceived['force_refresh_cache']) === true && $dataReceived['force_refresh_cache'] === false) {
+        if (
+            $isSearchMode === false
+            && isset($dataReceived['force_refresh_cache']) === true
+            && $dataReceived['force_refresh_cache'] === false
+        ) {
             $goCachedFolders = loadFoldersListByCache('visible_folders', 'folders');
             if ($goCachedFolders['state'] === true) {
                 // Check client-side version to avoid sending unchanged data
@@ -6730,6 +6738,17 @@ switch ($inputData['type']) {
                 || isset($accessibleFoldersSet[$folder->id])
             ) {
                 if (isset($displayableFolders[$folder->id])) {
+                    if ($isSearchMode === true) {
+                        $folderTitle = (string) $folder->title;
+                        $matchesSearch = function_exists('mb_stripos')
+                            ? mb_stripos($folderTitle, $searchTerm, 0, 'UTF-8') !== false
+                            : stripos($folderTitle, $searchTerm) !== false;
+
+                        if ($matchesSearch === false) {
+                            continue;
+                        }
+                    }
+
                     // ALL FOLDERS
                     $path = '';
                     if ($includeFullPath === true) {
@@ -6767,13 +6786,15 @@ switch ($inputData['type']) {
             // store array to return
             $arr_data['folders'] = $arrayFolders;
 
-            // update cache
-            cacheTreeUserHandler(
-                (int) $session->get('user-id'),
-                json_encode($arr_data['folders']),
-                $SETTINGS,
-                'visible_folders',
-            );
+            // update cache for full-list mode only
+            if ($isSearchMode === false) {
+                cacheTreeUserHandler(
+                    (int) $session->get('user-id'),
+                    json_encode($arr_data['folders']),
+                    $SETTINGS,
+                    'visible_folders',
+                );
+            }
         }
 
         // send data with version
