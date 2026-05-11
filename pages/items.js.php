@@ -4406,6 +4406,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
         var data = {
             'force_refresh_cache': forceRefreshCache,
+            'include_paths': false,
             'folders_version': foldersVersion,
         }
         if (debugJavascript === true) {
@@ -4485,7 +4486,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                                 ((value.disabled === 1) ? ' disabled="disabled"' : '') +
                                 ' data-parent-id="' + value.parent_id + '">' +
                                 '&nbsp;'.repeat(value.level) +
-                                value.title + (value.path !== '' ? ' [' + value.path + ']' : '') + '</option>';
+                                value.title + ((value.path !== undefined && value.path !== '') ? ' [' + value.path + ']' : '') + '</option>';
                         });
 
                         // Append new list
@@ -8198,7 +8199,8 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 'sources/items.queries.php', {
                     type: 'refresh_visible_folders',
                     data: prepareExchangedData(JSON.stringify({
-                        'force_refresh_cache': true
+                        'force_refresh_cache': true,
+                        'include_paths': false
                     }), 'encode', '<?php echo $session->get('key'); ?>'),
                     key: '<?php echo $session->get('key'); ?>'
                 },
@@ -8217,7 +8219,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                                     ((value.disabled === 1) ? ' disabled="disabled"' : '') +
                                     ' data-parent-id="' + value.parent_id + '">' +
                                     '&nbsp;'.repeat(value.level) +
-                                    value.title + (value.path !== '' ? ' [' + value.path + ']' : '') + '</option>';
+                                    value.title + ((value.path !== undefined && value.path !== '') ? ' [' + value.path + ']' : '') + '</option>';
                             });
                             $('#form-item-folder, #form-item-copy-destination, #form-folder-add-parent,' +
                                     '#form-folder-delete-selection, #form-folder-copy-source, #form-folder-copy-destination')

@@ -6591,6 +6591,8 @@ switch ($inputData['type']) {
             $inputData['data'],
             'decode'
         );
+        $includeFullPath = isset($dataReceived['include_paths'])
+            && filter_var($dataReceived['include_paths'], FILTER_VALIDATE_BOOLEAN);
 
         // do we have a cache to be used?
         if (isset($dataReceived['force_refresh_cache']) === true && $dataReceived['force_refresh_cache'] === false) {
@@ -6729,14 +6731,17 @@ switch ($inputData['type']) {
             ) {
                 if (isset($displayableFolders[$folder->id])) {
                     // ALL FOLDERS
-                    // Build path by walking parent_id chain in memory (no DB query)
-                    $pathParts = [];
-                    $currentId = $folder->parent_id;
-                    while (isset($foldersById[$currentId])) {
-                        $pathParts[] = htmlspecialchars(stripslashes(htmlspecialchars_decode($foldersById[$currentId]->title, ENT_QUOTES)), ENT_QUOTES);
-                        $currentId = $foldersById[$currentId]->parent_id;
+                    $path = '';
+                    if ($includeFullPath === true) {
+                        // Build path by walking parent_id chain in memory (no DB query)
+                        $pathParts = [];
+                        $currentId = $folder->parent_id;
+                        while (isset($foldersById[$currentId])) {
+                            $pathParts[] = htmlspecialchars(stripslashes(htmlspecialchars_decode($foldersById[$currentId]->title, ENT_QUOTES)), ENT_QUOTES);
+                            $currentId = $foldersById[$currentId]->parent_id;
+                        }
+                        $path = implode(' / ', array_reverse($pathParts));
                     }
-                    $path = implode(' / ', array_reverse($pathParts));
 
                     // Build array
                     array_push($arrayFolders, [
@@ -6749,9 +6754,12 @@ switch ($inputData['type']) {
                         ) ? 1 : 0,
                         'parent_id' => (int) $folder->parent_id,
                         'perso' => (int) $folder->personal_folder,
-                        'path' => htmlspecialchars($path),
                         'is_visible_active' => isset($readOnlyFoldersSet[$folder->id]) ? 1 : 0,
                     ]);
+
+                    if ($includeFullPath === true) {
+                        $arrayFolders[count($arrayFolders) - 1]['path'] = htmlspecialchars($path);
+                    }
                 }
             }
         }
