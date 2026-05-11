@@ -279,9 +279,10 @@ switch ($inputData['type']) {
 
             //-> DO A SET OF CHECKS
             // Perform a check in case of Read-Only user creating an item in his PF
-            if ((int) $session->get('user-read_only') === 1
+            if (
+                (int) $session->get('user-read_only') === 1
                 && (in_array($inputData['folderId'], $session->get('user-personal_folders')) === false
-                || (int) $post_folder_is_personal !== 1)
+                    || (int) $post_folder_is_personal !== 1)
             ) {
                 echo (string) prepareExchangedData(
                     array(
@@ -442,7 +443,7 @@ switch ($inputData['type']) {
                 $post_password_key = $cryptedStuff['objectKey'];
                 $itemFilesForTasks = [];
                 $itemFieldsForTasks = [];
-                
+
                 // ADD item
                 DB::insert(
                     prefixTable('items'),
@@ -531,7 +532,6 @@ switch ($inputData['type']) {
                                         'object_key' => $cryptedStuff['objectKey'],
                                     ]
                                 );
-                                
                             } else {
                                 // update value
                                 DB::insert(
@@ -760,8 +760,8 @@ switch ($inputData['type']) {
                                     $lang->get('email_subject_item_updated'),
                                     str_replace(
                                         array('#label', '#link'),
-                                            array($path, $SETTINGS['email_server_url'] . '/index.php?page=items&group=' . $inputData['folderId'] . '&id=' . strval($newID) . strval($lang->get('email_body3'))),
-                                            $lang->get('new_item_email_body')
+                                        array($path, $SETTINGS['email_server_url'] . '/index.php?page=items&group=' . $inputData['folderId'] . '&id=' . strval($newID) . strval($lang->get('email_body3'))),
+                                        $lang->get('new_item_email_body')
                                     ),
                                     $emailAddress,
                                     $post_diffusion_list_names[$cpt]
@@ -875,11 +875,11 @@ switch ($inputData['type']) {
         // Prepare variables
         $itemInfos = array();
         $inputData['label'] = isset($dataReceived['label']) && is_string($dataReceived['label']) ? filter_var($dataReceived['label'], FILTER_SANITIZE_FULL_SPECIAL_CHARS) : '';
-        $post_url = isset($dataReceived['url'])=== true ? filter_var(htmlspecialchars_decode($dataReceived['url']), FILTER_SANITIZE_URL) : '';
+        $post_url = isset($dataReceived['url']) === true ? filter_var(htmlspecialchars_decode($dataReceived['url']), FILTER_SANITIZE_URL) : '';
         $post_password = $original_pw = isset($dataReceived['pw']) && is_string($dataReceived['pw']) ? htmlspecialchars_decode($dataReceived['pw']) : '';
         $post_login = isset($dataReceived['login']) && is_string($dataReceived['login']) ? filter_var(htmlspecialchars_decode($dataReceived['login']), FILTER_SANITIZE_FULL_SPECIAL_CHARS) : '';
-        $post_tags = isset($dataReceived['tags'])=== true ? htmlspecialchars($dataReceived['tags']) : '';
-        $post_email = isset($dataReceived['email'])=== true ? filter_var(htmlspecialchars_decode($dataReceived['email']), FILTER_SANITIZE_EMAIL) : '';
+        $post_tags = isset($dataReceived['tags']) === true ? htmlspecialchars($dataReceived['tags']) : '';
+        $post_email = isset($dataReceived['email']) === true ? filter_var(htmlspecialchars_decode($dataReceived['email']), FILTER_SANITIZE_EMAIL) : '';
         $post_template_id = (int) filter_var($dataReceived['template_id'], FILTER_SANITIZE_NUMBER_INT);
         $inputData['itemId'] = (int) filter_var($dataReceived['id'], FILTER_SANITIZE_NUMBER_INT);
         $post_anyone_can_modify = (int) filter_var($dataReceived['anyone_can_modify'], FILTER_SANITIZE_NUMBER_INT);
@@ -908,9 +908,9 @@ switch ($inputData['type']) {
             FILTER_SANITIZE_NUMBER_INT
         );
         $post_to_be_deleted_after_date = isset($dataReceived['to_be_deleted_after_date']) === true ? filter_var(
-                $dataReceived['to_be_deleted_after_date'],
-                FILTER_SANITIZE_FULL_SPECIAL_CHARS
-            ) :
+            $dataReceived['to_be_deleted_after_date'],
+            FILTER_SANITIZE_FULL_SPECIAL_CHARS
+        ) :
             '';
         $post_fields = [];
         foreach ($dataReceived['fields'] as $field) {
@@ -947,7 +947,7 @@ switch ($inputData['type']) {
             echo (string) prepareExchangedData(
                 array(
                     'error' => true,
-                    'message' => $lang->get('error_data_not_valid').' - '.$lang->get('field').' '.strtoupper($dataCheck['field']).' '.$lang->get('exceeds_maximum_length_of').' '.$dataCheck['maxLength'].' ('.$dataCheck['currentLength'].')',
+                    'message' => $lang->get('error_data_not_valid') . ' - ' . $lang->get('field') . ' ' . strtoupper($dataCheck['field']) . ' ' . $lang->get('exceeds_maximum_length_of') . ' ' . $dataCheck['maxLength'] . ' (' . $dataCheck['currentLength'] . ')',
                 ),
                 'encode'
             );
@@ -1084,11 +1084,11 @@ switch ($inputData['type']) {
             WHERE object_id = %i AND user_id = %s',
             $inputData['itemId'],
             $session->get('user-id')
-            );
+        );
         // If no sharekey found, and item is not personal, then stop the process
         if (DB::count() === 0 && intval($dataItem['perso']) !== 1) {
             if (defined('LOG_TO_SERVER') && LOG_TO_SERVER === true) {
-                error_log('TEAMPASS | user '.$session->get('user-id').' has no sharekey for item '.$inputData['itemId']);
+                error_log('TEAMPASS | user ' . $session->get('user-id') . ' has no sharekey for item ' . $inputData['itemId']);
             }
             echo (string) prepareExchangedData(
                 array(
@@ -1198,7 +1198,7 @@ switch ($inputData['type']) {
                     isset($previousValue['string']) === true ? $previousValue['string'] : '',
                 );
             }
-            
+
             // encrypt PW on if it has changed, or if it is empty
             if (
                 (
@@ -1227,7 +1227,7 @@ switch ($inputData['type']) {
                 );
 
                 // Create a task to create sharekeys for users
-                if (WIP=== true) error_log('createTaskForItem - new password for this item - '.$post_password ." -- ". $pw);
+                if (WIP === true) error_log('createTaskForItem - new password for this item - ' . $post_password . " -- " . $pw);
                 $tasksToBePerformed = ['item_password'];
                 $encryptionTaskIsRequested = true;
                 $passwordWasUpdated = true;
@@ -1257,7 +1257,7 @@ switch ($inputData['type']) {
                 $postArrayTags = explode(' ', $post_tags);
                 foreach ($postArrayTags as $tag) {
                     if (empty($tag) === false) {
-                    // save in DB
+                        // save in DB
                         DB::insert(
                             prefixTable('tags'),
                             array(
@@ -1323,7 +1323,7 @@ switch ($inputData['type']) {
                 isset($SETTINGS['item_extra_fields']) === true
                 && (int) $SETTINGS['item_extra_fields'] === 1
                 && empty($post_fields) === false
-            ) {                
+            ) {
                 foreach ($post_fields as $field) {
                     if (empty($field['value']) === false) {
                         $dataTmpCat = DB::queryFirstRow(
@@ -1548,7 +1548,7 @@ switch ($inputData['type']) {
 
             // create a task for all fields updated
             if ($encryptionTaskIsRequested === true && intval($dataItem['perso']) !== 1) {
-                if (WIP === true) error_log('createTaskForItem - '.print_r($tasksToBePerformed, true));
+                if (WIP === true) error_log('createTaskForItem - ' . print_r($tasksToBePerformed, true));
                 createTaskForItem(
                     'item_update_create_keys',
                     array_unique($tasksToBePerformed),
@@ -1821,7 +1821,7 @@ switch ($inputData['type']) {
                     'decrypt'
                 )['string'];
             } else {
-                $currentsecret='';
+                $currentsecret = '';
             }
 
             // If OTP secret provided then encrypt it
@@ -1832,10 +1832,11 @@ switch ($inputData['type']) {
                     '',
                     'encrypt'
                 );
-           }
+            }
 
             // Check if status or secret or phone number has changed
-            if (DB::count() > 0
+            if (
+                DB::count() > 0
                 && (
                     (intval($otpStatus['otp_is_enabled']) !== (int) $post_otp_is_enabled)
                     || ($otpStatus['phone_number'] !== $post_otp_phone_number)
@@ -1893,13 +1894,13 @@ switch ($inputData['type']) {
                         $session->get('user-id'),
                         'at_modification',
                         $session->get('user-login'),
-                        'at_otp_secret:'.$currentsecret
+                        'at_otp_secret:' . $currentsecret
                     );
                 }
             } elseif (DB::count() === 0 && empty($post_otp_secret) === false) {
                 // Create the entry in items_otp table
                 // OTP doesn't exist then create it
-                
+
                 // insert in table
                 DB::insert(
                     prefixTable('items_otp'),
@@ -2081,9 +2082,9 @@ switch ($inputData['type']) {
             FROM ' . prefixTable('items') . ' as i
             LEFT JOIN ' . prefixTable('log_items') . ' as l ON (l.id_item = i.id AND l.action = %s)
             WHERE i.id=%i',
-            'at_creation',
-            $inputData['itemId']
-        );
+                'at_creation',
+                $inputData['itemId']
+            );
             // Reload History
             $history = '';
             $rows = DB::query(
@@ -3027,7 +3028,7 @@ switch ($inputData['type']) {
                     WHERE id_folder=%i',
                     $inputData['folderId']
                 );
-                
+
                 if (DB::count() > 0) {
                     foreach ($rows_tmp as $row) {
                         array_push($arrCatList, intval($row['id_category']));
@@ -3187,8 +3188,7 @@ switch ($inputData['type']) {
 
                 // Now delete if required
                 if ($dataDelete !== null && (intval($dataDelete['del_enabled']) === 1
-                    || intval($arrData['id_user']) !== intval($session->get('user-id'))))
-                {
+                    || intval($arrData['id_user']) !== intval($session->get('user-id')))) {
                     if (intval($dataDelete['del_type']) === 1 && intval($dataDelete['del_value']) >= 1) {
                         // decrease counter
                         DB::update(
@@ -3288,7 +3288,7 @@ switch ($inputData['type']) {
 
         // Encrypt data to return
         echo (string) prepareExchangedData(
-            $arrData, 
+            $arrData,
             'encode'
         );
         break;
@@ -3385,14 +3385,14 @@ switch ($inputData['type']) {
                 $returnArray,
                 'encode'
             );
-        // Get all expected data about this ITEM
+            // Get all expected data about this ITEM
         } else {
             // generate 2d key
             $session->set('user-key_tmp', bin2hex(GenerateCryptKey(16, false, true, true, false, true)));
 
             // Prepare files listing
             $attachments = [];
-            
+
             // launch query
             $rows = DB::query(
                 'SELECT id, name, file, extension, size
@@ -3438,7 +3438,8 @@ switch ($inputData['type']) {
             $returnArray['otp_secret'] = (string) $secret;
 
             // Add this item to the latests list
-            if ($session->has('user-latest_items') && isset($SETTINGS['max_latest_items']) &&
+            if (
+                $session->has('user-latest_items') && isset($SETTINGS['max_latest_items']) &&
                 in_array($dataItem['id'], $session->get('user-latest_items')) === false
             ) {
                 if (count($session->get('user-latest_items')) >= $SETTINGS['max_latest_items']) {
@@ -3446,7 +3447,7 @@ switch ($inputData['type']) {
                     SessionManager::specificOpsOnSessionArray('user-latest_items', 'pop');
                 }
                 SessionManager::specificOpsOnSessionArray('user-latest_items', 'unshift', $dataItem['id']);
-                
+
                 // Store in DB this item as lastest item seen
                 updateUserLatestItems($session->get('user-id'), intval($dataItem['id']));
             }
@@ -3524,7 +3525,7 @@ switch ($inputData['type']) {
                 $reveivers = [];
                 $rows = DB::query(
                     'SELECT email
-                    FROM ' . prefixTable('users').'
+                    FROM ' . prefixTable('users') . '
                     WHERE admin = %i',
                     1
                 );
@@ -3571,7 +3572,7 @@ switch ($inputData['type']) {
             }
 
             $session->set('system-show_step2', false);
-            
+
             // deepcode ignore ServerLeak: Data is encrypted before being sent
             echo (string) prepareExchangedData(
                 $returnArray,
@@ -3612,7 +3613,7 @@ switch ($inputData['type']) {
             $inputData['data'],
             'decode'
         );
-        
+
         // Prepare POST variables
         $data = [
             'itemId' => isset($dataReceived['item_id']) === true ? $dataReceived['item_id'] : '',
@@ -3620,19 +3621,19 @@ switch ($inputData['type']) {
             'accessLevel' => isset($dataReceived['access_level']) === true ? $dataReceived['access_level'] : '',
             'itemKey' => isset($dataReceived['item_key']) === true ? $dataReceived['item_key'] : '',
         ];
-        
+
         $filters = [
             'itemId' => 'cast:integer',
             'folderId' => 'cast:integer',
             'accessLevel' => 'cast:integer',
             'itemKey' => 'trim|escape',
         ];
-        
+
         $inputData = dataSanitizer(
             $data,
             $filters
         );
-        
+
         if (empty($inputData['itemId']) === true && empty($inputData['itemKey']) === true) {
             echo (string) prepareExchangedData(
                 array(
@@ -3788,7 +3789,7 @@ switch ($inputData['type']) {
                 'decrypt'
             )['string'];
         }
-        
+
         // Generate OTP code
         if (empty($secret) === false) {
             try {
@@ -3805,7 +3806,7 @@ switch ($inputData['type']) {
             $otpCode = '';
             $otpExpiresIn = '';
         }
-        
+
         // deepcode ignore ServerLeak: Data is encrypted before being sent
         echo (string) prepareExchangedData(
             array(
@@ -3969,7 +3970,7 @@ switch ($inputData['type']) {
             echo (string) prepareExchangedData(
                 array(
                     'error' => true,
-                    'message' => $lang->get('error_not_allowed_to')." BOOH 1",
+                    'message' => $lang->get('error_not_allowed_to') . " BOOH 1",
                 ),
                 'encode'
             );
@@ -4044,9 +4045,9 @@ switch ($inputData['type']) {
             $uniqueLoadData['path'] = $arr_arbo;
 
             // store last folder accessed in cookie
-            $arr_cookie_options = array (
+            $arr_cookie_options = array(
                 'expires' => time() + TP_ONE_DAY_SECONDS * 5,
-                'path' => '/', 
+                'path' => '/',
                 'secure' => true,
                 'httponly' => true,
                 'samesite' => 'Lax' // None || Lax  || Strict
@@ -4211,7 +4212,7 @@ switch ($inputData['type']) {
             $folder_is_personal = $uniqueLoadData['folder_is_personal'];
             $folder_is_in_personal = $uniqueLoadData['folder_is_in_personal'];
         }
-        
+
         // prepare query WHere conditions
         $where = new WhereClause('and');
         $where->add('i.id_tree=%i', $inputData['id']);
@@ -4230,7 +4231,7 @@ switch ($inputData['type']) {
                 $query_limit = ' LIMIT ' .
                     $start . ',' .
                     $post_nb_items_to_display_once;
-                    
+
                 $rows = DB::query(
                     'SELECT i.id AS id, i.item_key AS item_key, i.restricted_to, i.perso,
                     i.label, i.description, i.login,
@@ -4243,8 +4244,11 @@ switch ($inputData['type']) {
                     $where
                 );
             } else {
-                $post_nb_items_to_display_once = 'max';
                 $where->add('i.inactif=%i', 0);
+
+                $query_limit = ' LIMIT ' .
+                    $start . ',' .
+                    $post_nb_items_to_display_once;
 
                 $rows = DB::query(
                     'SELECT i.id AS id, i.item_key AS item_key, i.restricted_to, i.perso,
@@ -4254,7 +4258,7 @@ switch ($inputData['type']) {
                     FROM ' . prefixTable('items') . ' AS i
                     INNER JOIN ' . prefixTable('nested_tree') . ' AS n ON (i.id_tree = n.id)
                     WHERE %l
-                    ORDER BY i.label ASC',
+                    ORDER BY i.label ASC' . $query_limit,
                     $where
                 );
             }
@@ -4340,19 +4344,8 @@ switch ($inputData['type']) {
                         $record['perso'] = 1;
                     }
 
-                    // Does this item has restriction to groups of users?
-                    // Use INNER JOIN to exclude orphaned entries from deleted roles
-                    $item_is_restricted_to_role = false;
-                    DB::queryFirstRow(
-                        'SELECT r.role_id
-                        FROM ' . prefixTable('restriction_to_roles') . ' AS r
-                        INNER JOIN ' . prefixTable('roles_title') . ' AS t ON t.id = r.role_id
-                        WHERE r.item_id = %i',
-                        $record['id']
-                    );
-                    if (DB::count() > 0) {
-                        $item_is_restricted_to_role = true;
-                    }
+                    // Does this item have role-based restrictions? (batch pre-fetched)
+                    $item_is_restricted_to_role = isset($batchRestrictedToRoles[$record['id']]);
 
                     // Has this item a restriction to Groups of Users (batch pre-fetched)
                     $user_is_included_in_role = isset($batchUserIncludedInRole[$record['id']]);
@@ -4678,11 +4671,13 @@ switch ($inputData['type']) {
             'at_password_shown',
             'at_password_shown_edit_form',
         ];
-        
+
         // User not allowed to see this password or invalid action provided
-        if ($userAccess !== true
+        if (
+            $userAccess !== true
             || empty($inputData['action'])
-            || !in_array($inputData['action'], $allowedActions, true)) {
+            || !in_array($inputData['action'], $allowedActions, true)
+        ) {
 
             echo (string) prepareExchangedData(
                 [
@@ -4848,9 +4843,9 @@ switch ($inputData['type']) {
                 WHERE id = %s',
                 $inputData['folderId']
             );
-            
+
             $folder_is_personal = $data_pf !== null ? intval($data_pf['personal_folder']) : 0;
-            
+
             $visibilite = $session->get('user-name') . ' ' . $session->get('user-lastname') . ' (' . $session->get('user-login') . ')';
         }
 
@@ -4902,7 +4897,7 @@ switch ($inputData['type']) {
                 }
             }
         }
-        
+
         // Get access level for this folder
         $accessLevel = 0;
         if ($folder_is_personal === 0) {
@@ -4916,7 +4911,7 @@ switch ($inputData['type']) {
                     $role,
                     $inputData['folderId']
                 );
-                if (DB::count()>0) {
+                if (DB::count() > 0) {
                     if ($access['type'] === 'R') {
                         array_push($arrTmp, 10);
                     } elseif ($access['type'] === 'W') {
@@ -5262,7 +5257,7 @@ switch ($inputData['type']) {
             $inputData['itemId'],
             $inputData['folderId'],
         );
-        
+
         if ($checkRights['error'] || !$checkRights['edit']) {
             echo (string) prepareExchangedData(
                 array(
@@ -6029,7 +6024,7 @@ switch ($inputData['type']) {
         );
         break;
 
-        /*
+    /*
         * CASE
         * Send email
     */
@@ -6210,7 +6205,7 @@ switch ($inputData['type']) {
                 $session->get('user-login'),
                 htmlspecialchars_decode($label, ENT_QUOTES),
                 null,
-                (string) dateToStamp($date.' '.$time, $SETTINGS['date_format'] . ' ' . $SETTINGS['time_format'])
+                (string) dateToStamp($date . ' ' . $time, $SETTINGS['date_format'] . ' ' . $SETTINGS['time_format'])
             );
             // Prepare new line
             $data = DB::queryFirstRow(
@@ -6395,7 +6390,7 @@ switch ($inputData['type']) {
         // get parameters from original link
         $url = $dataReceived['original_link'];
         $parts = parse_url($url);
-        if(isset($parts['query'])){
+        if (isset($parts['query'])) {
             parse_str($parts['query'], $orignal_link_parameters);
         } else {
             $orignal_link_parameters = array();
@@ -6430,9 +6425,9 @@ switch ($inputData['type']) {
             } else {
                 $domain_host = (string) $SETTINGS['otv_subdomain'] . '.' . $domain_host;
             }
-            $url = $domain_scheme.'://'.$domain_host . '/index.php?'.http_build_query($otv_session);
+            $url = $domain_scheme . '://' . $domain_host . '/index.php?' . http_build_query($otv_session);
         } else {
-            $url = $SETTINGS['cpassman_url'] . '/index.php?'.http_build_query($otv_session);
+            $url = $SETTINGS['cpassman_url'] . '/index.php?' . http_build_query($otv_session);
         }
 
         echo (string) prepareExchangedData(
@@ -6445,7 +6440,7 @@ switch ($inputData['type']) {
         break;
 
 
-        /*
+    /*
     * CASE
     * Free Item for Edition
     */
@@ -6647,7 +6642,7 @@ switch ($inputData['type']) {
         $readOnlyFoldersSet = (null !== $session->get('user-read_only_folders'))
             ? array_flip($session->get('user-read_only_folders'))
             : [];
-        
+
         //Build tree (no rebuild needed - MPTT values are maintained by write operations)
         $tree->rebuild();
         $folders = $tree->getDescendants();
@@ -6798,7 +6793,7 @@ switch ($inputData['type']) {
 
         break;
 
-        /*
+    /*
     * CASE
     * Load item history
     */
@@ -6811,7 +6806,7 @@ switch ($inputData['type']) {
             );
             break;
         }
-        
+
         // get item info
         $dataItem = DB::queryFirstRow(
             'SELECT *
@@ -6840,7 +6835,7 @@ switch ($inputData['type']) {
             } else {
                 $reason = array_map('trim', explode(':', $record['raison']));
             }
-            
+
             // imported via API
             if (empty($record['login']) === true) {
                 $record['login'] = $lang->get('imported_via_api') . ' [' . strval($record['raison']) . ']';
@@ -6862,7 +6857,7 @@ switch ($inputData['type']) {
             $detail = '';
             if ($reason[0] === 'at_pw') {
                 $action = $lang->get($reason[0]);
-                
+
                 // get previous password
                 if (empty($record['old_value']) === false) {
                     $previous_pwd = cryption(
@@ -6871,7 +6866,7 @@ switch ($inputData['type']) {
                         'decrypt'
                     );
                     array_push(
-                        $previous_passwords, 
+                        $previous_passwords,
                         [
                             'password' => htmlentities($previous_pwd['string']),
                             'date' => date($SETTINGS['date_format'] . ' ' . $SETTINGS['time_format'], intval($record['date'])),
@@ -6936,8 +6931,13 @@ switch ($inputData['type']) {
         }
 
         // order previous passwords by date
-        $key_values = array_column($previous_passwords, 'date'); 
-        array_multisort($key_values, /** @scrutinizer ignore-type */SORT_DESC, $previous_passwords);
+        $key_values = array_column($previous_passwords, 'date');
+        array_multisort(
+            $key_values,
+            /** @scrutinizer ignore-type */
+            SORT_DESC,
+            $previous_passwords
+        );
 
         // send data
         // deepcode ignore ServerLeak: Data is encrypted before being sent
@@ -7251,7 +7251,7 @@ switch ($inputData['type']) {
 
         break;
 
-        /*
+    /*
     * CASE
     * confirm_attachments
     */
@@ -7362,24 +7362,81 @@ switch ($inputData['type']) {
 
         break;
 
-        /*
+    /*
         * CASE
         * items_delete
         */
-        case 'items_delete':
-            // Check KEY
-            if ($inputData['key'] !== $session->get('key')) {
-                echo (string) prepareExchangedData(
-                    array(
-                        'error' => 'key_not_conform',
-                        'message' => $lang->get('key_is_not_correct'),
-                    ),
-                    'encode'
-                );
-                break;
+    case 'items_delete':
+        // Check KEY
+        if ($inputData['key'] !== $session->get('key')) {
+            echo (string) prepareExchangedData(
+                array(
+                    'error' => 'key_not_conform',
+                    'message' => $lang->get('key_is_not_correct'),
+                ),
+                'encode'
+            );
+            break;
+        }
+
+        if ($session->get('user-read_only') === 1) {
+            echo (string) prepareExchangedData(
+                array(
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
+                ),
+                'encode'
+            );
+            break;
+        }
+
+        // decrypt and retrieve data in JSON format
+        $dataReceived = prepareExchangedData(
+            $inputData['data'],
+            'decode'
+        );
+
+        // Prepare POST variables
+        $selectedItemIdsJson = $dataReceived['selectedItemIds'] ?? '[]';
+        $selectedItemIds = json_decode($selectedItemIdsJson, true) ?: array();
+        $selectedItemIds = array_map(function ($id) {
+            return filter_var($id, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        }, $selectedItemIds);
+
+        // Initialiser les variables de gestion d'erreurs
+        $successfulDeletions = array();
+        $failedDeletions = array();
+
+        foreach ($selectedItemIds as $itemId) {
+            // Check that user can access this item
+            $granted = accessToItemIsGranted((int) $itemId, $SETTINGS);
+            if ($granted !== true) {
+                $failedDeletions[$itemId] = $granted;
+                continue; // Passer à l'item suivant
             }
 
-            if ($session->get('user-read_only') === 1) {
+            // Load item data
+            $data = DB::queryFirstRow(
+                'SELECT id_tree, id, label
+                    FROM ' . prefixTable('items') . '
+                    WHERE id = %i',
+                $itemId
+            );
+            if ($data === null) {
+                $failedDeletions[$itemId] = $lang->get('error_item_not_found');
+                continue; // Passer à l'item suivant
+            }
+            $itemLabel = $data['label'];
+            $itemTreeId = intval($data['id_tree']);
+
+            // Check that user can delete on this folder
+            $checkRights = getCurrentAccessRights(
+                $session->get('user-id'),
+                (int) $itemId,
+                $itemTreeId,
+            );
+
+            if ($checkRights['error'] || !$checkRights['delete']) {
                 echo (string) prepareExchangedData(
                     array(
                         'error' => true,
@@ -7387,108 +7444,51 @@ switch ($inputData['type']) {
                     ),
                     'encode'
                 );
-                break;
             }
 
-            // decrypt and retrieve data in JSON format
-            $dataReceived = prepareExchangedData(
-                $inputData['data'],
-                'decode'
-            );
-            
-            // Prepare POST variables
-            $selectedItemIdsJson = $dataReceived['selectedItemIds'] ?? '[]';
-            $selectedItemIds = json_decode($selectedItemIdsJson, true) ?: array();
-            $selectedItemIds = array_map(function($id) {
-                return filter_var($id, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-            }, $selectedItemIds);
-
-            // Initialiser les variables de gestion d'erreurs
-            $successfulDeletions = array();
-            $failedDeletions = array();
-
-            foreach( $selectedItemIds as $itemId) {
-                // Check that user can access this item
-                $granted = accessToItemIsGranted((int) $itemId, $SETTINGS);
-                if ($granted !== true) {
-                    $failedDeletions[$itemId] = $granted;
-                    continue; // Passer à l'item suivant
-                }
-
-                // Load item data
-                $data = DB::queryFirstRow(
-                    'SELECT id_tree, id, label
-                    FROM ' . prefixTable('items') . '
-                    WHERE id = %i',
-                    $itemId
-                );
-                if ($data === null) {
-                    $failedDeletions[$itemId] = $lang->get('error_item_not_found');
-                    continue; // Passer à l'item suivant
-                }
-                $itemLabel = $data['label'];
-                $itemTreeId = intval($data['id_tree']);
-
-                // Check that user can delete on this folder
-                $checkRights = getCurrentAccessRights(
-                    $session->get('user-id'),
-                    (int) $itemId,
-                    $itemTreeId,
-                );
-
-                if ($checkRights['error'] || !$checkRights['delete']) {
-                    echo (string) prepareExchangedData(
-                        array(
-                            'error' => true,
-                            'message' => $lang->get('error_not_allowed_to'),
-                        ),
-                        'encode'
-                    );
-                }
-
-                // delete item consists in disabling it
-                DB::update(
-                    prefixTable('items'),
-                    array(
-                        'inactif' => '1',
-                        'deleted_at' => time(),
-                    ),
-                    'id = %i',
-                    $itemId
-                );
-
-                // log
-                logItems(
-                    $SETTINGS,
-                    (int) $itemId,
-                    $itemLabel,
-                    $session->get('user-id'),
-                    'at_delete',
-                    $session->get('user-login')
-                );
-
-                // Update CACHE table
-                updateCacheTable('delete_value', (int) $itemId);
-
-                // Ajouter l'item à la liste des succès
-                $successfulDeletions[] = $itemId;
-            }
-
-            // Préparer la réponse
-            $response = array(
-                'successfulDeletions' => $successfulDeletions,
-                'failedDeletions' => $failedDeletions,
-                'error' => !empty($failedDeletions), // Indiquer s'il y a eu des erreurs
-                'message' => !empty($failedDeletions) ? $lang->get('some_items_failed_to_delete') : $lang->get('all_items_deleted_successfully')
+            // delete item consists in disabling it
+            DB::update(
+                prefixTable('items'),
+                array(
+                    'inactif' => '1',
+                    'deleted_at' => time(),
+                ),
+                'id = %i',
+                $itemId
             );
 
-            // send data
-            echo (string) prepareExchangedData(
-                $response,
-                'encode'
+            // log
+            logItems(
+                $SETTINGS,
+                (int) $itemId,
+                $itemLabel,
+                $session->get('user-id'),
+                'at_delete',
+                $session->get('user-login')
             );
 
-            break;
+            // Update CACHE table
+            updateCacheTable('delete_value', (int) $itemId);
+
+            // Ajouter l'item à la liste des succès
+            $successfulDeletions[] = $itemId;
+        }
+
+        // Préparer la réponse
+        $response = array(
+            'successfulDeletions' => $successfulDeletions,
+            'failedDeletions' => $failedDeletions,
+            'error' => !empty($failedDeletions), // Indiquer s'il y a eu des erreurs
+            'message' => !empty($failedDeletions) ? $lang->get('some_items_failed_to_delete') : $lang->get('all_items_deleted_successfully')
+        );
+
+        // send data
+        echo (string) prepareExchangedData(
+            $response,
+            'encode'
+        );
+
+        break;
 }
 
 // Build the QUERY in case of GET
@@ -7520,7 +7520,7 @@ if (isset($inputData['getType'])) {
  * @param int $groupe ID for group
  *
  * @return array list of roles
-*/
+ */
 function recupDroitCreationSansComplexite($groupe)
 {
     $data = DB::queryFirstRow(
@@ -7589,17 +7589,17 @@ function getCurrentAccessRights(int $userId, int $itemId, int $treeId, string $a
     if (getItemRestrictedUsersList($itemId, $userId) === false) {
         return getAccessResponse(false, false, false, false);
     }
-    
+
     // Check if the item is being processed by another user
     if (isProcessOnGoing($itemId)) {
         return getAccessResponse(false, true, false, false);
     }
-    
+
     // Check if the folder is in the user's read-only list
     if (in_array($treeId, $session->get('user-read_only_folders'))) {
         return getAccessResponse(false, true, false, false);
     }
-    
+
     // Check if the folder is in the user's allowed folders list defined by admin
     if (in_array($treeId, $session->get('user-allowed_folders_by_definition'))) {
         return getAccessResponse(false, true, true, true, [], true);
@@ -7613,7 +7613,7 @@ function getCurrentAccessRights(int $userId, int $itemId, int $treeId, string $a
     if (isset($visibleFolderIndex['personal'][$treeId])) {
         return getAccessResponse(false, true, true, true, [], true);
     }
-    
+
     // Determine the user's access rights based on their roles for this folder
     [$edit, $delete, $create] = getRoleBasedAccess($session, $treeId);
 
@@ -7878,7 +7878,7 @@ function isProcessOnGoing(int $itemId): bool
 
     // Check if there's an ongoing background encryption process for the item
     $ongoingProcess = DB::queryFirstRow(
-        'SELECT 1 FROM ' . prefixTable('background_tasks') . ' WHERE item_id = %i AND finished_at = "" LIMIT 1', 
+        'SELECT 1 FROM ' . prefixTable('background_tasks') . ' WHERE item_id = %i AND finished_at = "" LIMIT 1',
         $itemId
     );
 
@@ -7914,7 +7914,8 @@ function getUserVisibleFolders(int $userId): array
 
     // Return cache only if it exists, is valid JSON, and has not been invalidated
     // (invalidated_at > timestamp means the cache was marked stale after last rebuild)
-    if (!empty($visibleFolders) && is_array($visibleFolders)
+    if (
+        !empty($visibleFolders) && is_array($visibleFolders)
         && (int) ($data['invalidated_at'] ?? 0) <= (int) ($data['timestamp'] ?? 0)
     ) {
         $visibleFoldersCache[$userId] = $visibleFolders;

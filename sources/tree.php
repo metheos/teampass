@@ -145,12 +145,15 @@ if (DB::count() === 0) {
 $lastFolderChangeValeur = $lastFolderChange['valeur'] ?? 0;
 
 // Should we use a cache or refresh the tree
+// For search requests, ignore force_refresh from client and rely on cache invalidation timestamps.
+// This prevents expensive full tree rebuilds on every keystroke/page interaction from legacy clients.
+$effectiveForceRefresh = $searchTerm !== '' ? 0 : (int) $inputData['forceRefresh'];
 $goTreeRefresh = loadTreeStrategy(
     (int) $lastFolderChangeValeur,
     (int) $inputData['userTreeLastRefresh'],
     (null === $session->get('user-tree_structure') || empty($session->get('user-tree_structure')) === true) ? [] : $session->get('user-tree_structure'),
     (int) $inputData['userId'],
-    (int) $inputData['forceRefresh']
+    $effectiveForceRefresh
 );
 // We don't use the cache if an ID of folder is provided
 if ($goTreeRefresh['state'] === true || empty($inputData['nodeId']) === false) {
