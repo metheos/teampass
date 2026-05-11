@@ -3965,8 +3965,21 @@ switch ($inputData['type']) {
      * List items of a group
      */
     case 'do_items_list_in_folder':
+        $itemsListRequestStartedAt = microtime(true);
+        $sendItemsListTimingHeader = static function (float $startedAt, string $phase = ''): void {
+            if (headers_sent()) {
+                return;
+            }
+
+            $durationMs = (microtime(true) - $startedAt) * 1000;
+            $phaseLabel = $phase !== '' ? $phase : 'done';
+            header(sprintf('Server-Timing: tp_items_list;dur=%.1f;desc="%s"', $durationMs, $phaseLabel));
+            header(sprintf('X-TP-Items-List-Time-Ms: %.1f', $durationMs));
+        };
+
         // Check KEY and rights
         if ($inputData['key'] !== $session->get('key')) {
+            $sendItemsListTimingHeader($itemsListRequestStartedAt, 'denied-key');
             echo (string) prepareExchangedData(
                 array(
                     'error' => true,
@@ -3978,6 +3991,7 @@ switch ($inputData['type']) {
         }
 
         if (count($session->get('user-roles_array')) === 0) {
+            $sendItemsListTimingHeader($itemsListRequestStartedAt, 'denied-roles');
             echo (string) prepareExchangedData(
                 array(
                     'error' => true,
@@ -3995,6 +4009,7 @@ switch ($inputData['type']) {
         );
 
         if (is_array($dataReceived) === true && array_key_exists('id', $dataReceived) === false) {
+            $sendItemsListTimingHeader($itemsListRequestStartedAt, 'invalid-payload');
             echo (string) prepareExchangedData(
                 array(
                     'error' => true,
@@ -4144,6 +4159,7 @@ switch ($inputData['type']) {
                 $inputData['id'],
                 $session->get('user-accessible_folders')
             )) {
+                $sendItemsListTimingHeader($itemsListRequestStartedAt, 'not-authorized');
                 echo (string) prepareExchangedData(
                     array(
                         'error' => 'not_authorized',
@@ -4612,6 +4628,7 @@ switch ($inputData['type']) {
         }
 
         // Encrypt data to return
+        $sendItemsListTimingHeader($itemsListRequestStartedAt, 'ok');
         echo (string) prepareExchangedData(
             $returnValues,
             'encode'

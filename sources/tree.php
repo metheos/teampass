@@ -74,6 +74,17 @@ date_default_timezone_set($SETTINGS['timezone'] ?? 'UTC');
 // Set header properties
 header('Content-type: text/html; charset=utf-8');
 header('Cache-Control: no-cache, no-store, must-revalidate');
+$treeRequestStartedAt = microtime(true);
+$sendTreeTimingHeader = static function (float $startedAt, string $phase = ''): void {
+    if (headers_sent()) {
+        return;
+    }
+
+    $durationMs = (microtime(true) - $startedAt) * 1000;
+    $phaseLabel = $phase !== '' ? $phase : 'done';
+    header(sprintf('Server-Timing: tp_tree;dur=%.1f;desc="%s"', $durationMs, $phaseLabel));
+    header(sprintf('X-TP-Tree-Time-Ms: %.1f', $durationMs));
+};
 
 // --------------------------------- //
 
@@ -128,6 +139,7 @@ $inputData = dataSanitizer(
 
 $searchTerm = trim((string) ($inputData['searchTerm'] ?? ''));
 if (mb_strlen($searchTerm) < 6) {
+    $sendTreeTimingHeader($treeRequestStartedAt, 'short-search');
     echo json_encode(['unchanged' => false, 'version' => '', 'tree' => []]);
     exit;
 }
@@ -225,8 +237,10 @@ if ($goTreeRefresh['state'] === true || empty($inputData['nodeId']) === false) {
     // Send back with version for client-side caching
     $treeVersion = md5($filteredTreeJson);
     if (!empty($inputData['treeVersion']) && $inputData['treeVersion'] === $treeVersion) {
+        $sendTreeTimingHeader($treeRequestStartedAt, 'rebuilt-unchanged');
         echo json_encode(['unchanged' => true, 'version' => $treeVersion]);
     } else {
+        $sendTreeTimingHeader($treeRequestStartedAt, 'rebuilt');
         echo json_encode(['unchanged' => false, 'version' => $treeVersion, 'tree' => $filteredTree]);
     }
 } else {
@@ -236,8 +250,10 @@ if ($goTreeRefresh['state'] === true || empty($inputData['nodeId']) === false) {
     $filteredTree = filterTreeNodesBySearch($cachedTree, $searchTerm);
     $treeVersion = md5(json_encode($filteredTree));
     if (!empty($inputData['treeVersion']) && $inputData['treeVersion'] === $treeVersion) {
+        $sendTreeTimingHeader($treeRequestStartedAt, 'cached-unchanged');
         echo json_encode(['unchanged' => true, 'version' => $treeVersion]);
     } else {
+        $sendTreeTimingHeader($treeRequestStartedAt, 'cached');
         echo json_encode(['unchanged' => false, 'version' => $treeVersion, 'tree' => $filteredTree]);
     }
 }
