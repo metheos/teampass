@@ -4025,6 +4025,10 @@ switch ($inputData['type']) {
         $post_restricted = filter_var($dataReceived['restricted'], FILTER_SANITIZE_NUMBER_INT);
         $post_start = filter_var($dataReceived['start'], FILTER_SANITIZE_NUMBER_INT);
         $post_nb_items_to_display_once = filter_var($dataReceived['nb_items_to_display_once'], FILTER_SANITIZE_NUMBER_INT);
+        if ((int) $post_nb_items_to_display_once <= 0) {
+            $post_nb_items_to_display_once = 60;
+        }
+        $post_nb_items_to_display_once = min((int) $post_nb_items_to_display_once, 120);
 
         $arr_arbo = [];
         $folderIsPf = in_array($inputData['id'], $session->get('user-personal_folders')) === true ? true : false;
@@ -4589,14 +4593,13 @@ switch ($inputData['type']) {
 
         // count
         if ((int) $start === 0) {
-            DB::query(
-                'SELECT i.id
-                FROM ' . prefixTable('items') . ' as i
-                INNER JOIN ' . prefixTable('nested_tree') . ' as n ON (i.id_tree = n.id)
+            $counter_full = (int) DB::queryFirstField(
+                'SELECT COUNT(*)
+                FROM ' . prefixTable('items') . ' AS i
+                INNER JOIN ' . prefixTable('nested_tree') . ' AS n ON (i.id_tree = n.id)
                 WHERE %l',
                 $where
             );
-            $counter_full = DB::count();
             $uniqueLoadData['counter_full'] = $counter_full;
         }
 

@@ -144,6 +144,12 @@ if (mb_strlen($searchTerm) < 6) {
     exit;
 }
 
+// Do not keep the full tree JSON in session during search mode.
+// Large encrypted session payloads slow down every request using this session.
+if ($session->has('user-tree_structure') === true && !empty($session->get('user-tree_structure'))) {
+    $session->set('user-tree_structure', []);
+}
+
 $lastFolderChange = DB::queryFirstRow(
     'SELECT valeur FROM ' . prefixTable('misc') . '
     WHERE type = %s AND intitule = %s',
@@ -163,7 +169,7 @@ $effectiveForceRefresh = $searchTerm !== '' ? 0 : (int) $inputData['forceRefresh
 $goTreeRefresh = loadTreeStrategy(
     (int) $lastFolderChangeValeur,
     (int) $inputData['userTreeLastRefresh'],
-    (null === $session->get('user-tree_structure') || empty($session->get('user-tree_structure')) === true) ? [] : $session->get('user-tree_structure'),
+    [],
     (int) $inputData['userId'],
     $effectiveForceRefresh
 );
@@ -212,8 +218,7 @@ if ($goTreeRefresh['state'] === true || empty($inputData['nodeId']) === false) {
         }
     }
 
-    // Save in SESSION
-    $session->set('user-tree_structure', $ret_json);
+    // Save only the refresh timestamp in session; tree data stays in cache_tree table.
     $session->set('user-tree_last_refresh_timestamp', time());
 
     // Build visible_folders synchronously from the same tree data
