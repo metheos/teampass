@@ -3451,50 +3451,50 @@ switch ($inputData['type']) {
                 updateUserLatestItems($session->get('user-id'), intval($dataItem['id']));
             }
 
-            // get list of roles
+            // Get roles and users for the current folder in one query to avoid N+1 roundtrips.
             $listOptionsForUsers = array();
             $listOptionsForRoles = array();
+            $seenRoles = [];
+            $seenUsers = [];
+
             $rows = DB::query(
-                'SELECT r.role_id AS role_id, t.title AS title
+                'SELECT r.role_id AS role_id,
+                        t.title AS role_title,
+                        u.id AS user_id,
+                        u.login AS user_login,
+                        u.email AS user_email,
+                        u.name AS user_name,
+                        u.lastname AS user_lastname
                 FROM ' . prefixTable('roles_values') . ' AS r
                 INNER JOIN ' . prefixTable('roles_title') . ' AS t ON (r.role_id = t.id)
-                WHERE r.folder_id = %i',
+                LEFT JOIN ' . prefixTable('users_roles') . ' AS ur
+                    ON (ur.role_id = r.role_id AND ur.source = %s)
+                LEFT JOIN ' . prefixTable('users') . ' AS u ON (u.id = ur.user_id)
+                WHERE r.folder_id = %i
+                ORDER BY r.role_id, u.login',
+                'manual',
                 $dataItem['id_tree']
             );
-            foreach ($rows as $record) {
-                array_push(
-                    $listOptionsForRoles,
-                    array(
-                        'id' => intval($record['role_id']),
-                        'title' => $record['title'],
-                    )
-                );
-                $rows2 = DB::query(
-                    'SELECT DISTINCT u.id, u.login, u.email, u.name, u.lastname, ur.role_id AS fonction_id
-                    FROM ' . prefixTable('users') . ' AS u
-                    INNER JOIN ' . prefixTable('users_roles') . ' AS ur ON (u.id = ur.user_id)
-                    WHERE ur.role_id = %i AND ur.source = %s',
-                    $record['role_id'],
-                    'manual'
-                );
 
-                foreach ($rows2 as $record2) {
-                    foreach (explode(';', $record2['fonction_id']) as $role) {
-                        if (
-                            array_search($record2['id'], array_column($listOptionsForUsers, 'id')) === false
-                            && $role === $record['role_id']
-                        ) {
-                            array_push(
-                                $listOptionsForUsers,
-                                array(
-                                    'id' => intval($record2['id']),
-                                    'login' => $record2['login'],
-                                    'name' => strval($record2['name']) . ' ' . strval($record2['lastname']),
-                                    'email' => $record2['email'],
-                                )
-                            );
-                        }
-                    }
+            foreach ($rows as $record) {
+                $roleId = (int) $record['role_id'];
+                if (!isset($seenRoles[$roleId])) {
+                    $listOptionsForRoles[] = array(
+                        'id' => $roleId,
+                        'title' => strval($record['role_title']),
+                    );
+                    $seenRoles[$roleId] = true;
+                }
+
+                $userId = isset($record['user_id']) ? (int) $record['user_id'] : 0;
+                if ($userId > 0 && !isset($seenUsers[$userId])) {
+                    $listOptionsForUsers[] = array(
+                        'id' => $userId,
+                        'login' => strval($record['user_login']),
+                        'name' => trim(strval($record['user_name']) . ' ' . strval($record['user_lastname'])),
+                        'email' => strval($record['user_email']),
+                    );
+                    $seenUsers[$userId] = true;
                 }
             }
 
@@ -7607,19 +7607,18 @@ function getCurrentAccessRights(int $userId, int $itemId, int $treeId, string $a
 
     // Retrieve user's visible folders from the cache_tree table
     $visibleFolders = getUserVisibleFolders($userId);
+    $visibleFolderIndex = getUserVisibleFoldersIndex($userId);
 
     // Check if the folder is personal to the user
-    foreach ($visibleFolders as $folder) {
-        if ($folder['id'] == $treeId && (int) $folder['perso'] === 1) {
-            return getAccessResponse(false, true, true, true, [], true);
-        }
+    if (isset($visibleFolderIndex['personal'][$treeId])) {
+        return getAccessResponse(false, true, true, true, [], true);
     }
     
     // Determine the user's access rights based on their roles for this folder
     [$edit, $delete, $create] = getRoleBasedAccess($session, $treeId);
 
     // Is this folder in the list of visible folders?
-    if (!in_array($treeId, array_column($visibleFolders, 'id'))) {
+    if (!isset($visibleFolderIndex['ids'][$treeId])) {
         // If the folder is not visible to the user, they cannot edit or delete items in it
         return getAccessResponse(false, false, false, false);
     }
@@ -7650,41 +7649,56 @@ function getCurrentAccessRights(int $userId, int $itemId, int $treeId, string $a
 function getItemRestrictedUsersList(int $itemId, int $userId): bool
 {
     $session = SessionManager::getSession();
+    static $restrictionCache = [];
 
-    // Fetch user-level restriction list
-    $itemData = DB::queryFirstRow(
-        'SELECT restricted_to FROM ' . prefixTable('items') . ' WHERE id = %i',
-        $itemId
-    );
-    $restrictedUsers = [];
-    if (!empty($itemData['restricted_to'])) {
-        $restrictedUsers = array_map('intval', array_filter(explode(';', $itemData['restricted_to'])));
+    $userRolesRaw = (string) ($session->get('user-roles') ?? '');
+    $cacheKey = $itemId . ':' . $userId . ':' . md5($userRolesRaw);
+    if (isset($restrictionCache[$cacheKey])) {
+        return $restrictionCache[$cacheKey];
     }
 
-    // Fetch role-level restrictions
-    $restrictedRoles = DB::queryFirstColumn(
-        'SELECT role_id FROM ' . prefixTable('restriction_to_roles') . ' WHERE item_id = %i',
+    // Fetch user-level and role-level restrictions in one query.
+    $itemData = DB::queryFirstRow(
+        'SELECT i.restricted_to,
+                GROUP_CONCAT(DISTINCT r.role_id ORDER BY r.role_id SEPARATOR ";") AS restricted_roles
+         FROM ' . prefixTable('items') . ' AS i
+         LEFT JOIN ' . prefixTable('restriction_to_roles') . ' AS r ON (r.item_id = i.id)
+         WHERE i.id = %i
+         GROUP BY i.id, i.restricted_to',
         $itemId
     );
+
+    $restrictedUsers = [];
+    if (!empty($itemData) && !empty($itemData['restricted_to'])) {
+        $restrictedUsers = array_map('intval', array_filter(explode(';', $itemData['restricted_to'])));
+    }
+    $restrictedRoles = [];
+    if (!empty($itemData) && !empty($itemData['restricted_roles'])) {
+        $restrictedRoles = array_map('intval', array_filter(explode(';', (string) $itemData['restricted_roles'])));
+    }
 
     // No restrictions at all → open access
     if (empty($restrictedUsers) && empty($restrictedRoles)) {
+        $restrictionCache[$cacheKey] = true;
         return true;
     }
 
     // User is explicitly listed
     if (in_array($userId, $restrictedUsers, true)) {
+        $restrictionCache[$cacheKey] = true;
         return true;
     }
 
     // User has at least one of the restricted roles
     if (!empty($restrictedRoles)) {
-        $userRoles = array_map('intval', array_filter(explode(';', $session->get('user-roles') ?? '')));
+        $userRoles = array_map('intval', array_filter(explode(';', $userRolesRaw)));
         if (!empty(array_intersect($restrictedRoles, $userRoles))) {
+            $restrictionCache[$cacheKey] = true;
             return true;
         }
     }
 
+    $restrictionCache[$cacheKey] = false;
     return false;
 }
 
@@ -7856,6 +7870,12 @@ function createEditionLock(int $itemId, int $userId, int $timestamp): void
  */
 function isProcessOnGoing(int $itemId): bool
 {
+    static $processCache = [];
+
+    if (isset($processCache[$itemId])) {
+        return $processCache[$itemId];
+    }
+
     // Check if there's an ongoing background encryption process for the item
     $ongoingProcess = DB::queryFirstRow(
         'SELECT 1 FROM ' . prefixTable('background_tasks') . ' WHERE item_id = %i AND finished_at = "" LIMIT 1', 
@@ -7863,7 +7883,8 @@ function isProcessOnGoing(int $itemId): bool
     );
 
     // Return true if an ongoing process is found, otherwise false
-    return $ongoingProcess ? true : false;
+    $processCache[$itemId] = $ongoingProcess ? true : false;
+    return $processCache[$itemId];
 }
 
 /**
@@ -7875,6 +7896,12 @@ function isProcessOnGoing(int $itemId): bool
  */
 function getUserVisibleFolders(int $userId): array
 {
+    static $visibleFoldersCache = [];
+
+    if (isset($visibleFoldersCache[$userId])) {
+        return $visibleFoldersCache[$userId];
+    }
+
     // Query to retrieve visible folders for the user, including invalidation state
     $data = DB::queryFirstRow(
         'SELECT visible_folders, timestamp, IFNULL(invalidated_at, 0) AS invalidated_at
@@ -7890,11 +7917,48 @@ function getUserVisibleFolders(int $userId): array
     if (!empty($visibleFolders) && is_array($visibleFolders)
         && (int) ($data['invalidated_at'] ?? 0) <= (int) ($data['timestamp'] ?? 0)
     ) {
-        return $visibleFolders;
+        $visibleFoldersCache[$userId] = $visibleFolders;
+        return $visibleFoldersCache[$userId];
     }
 
     // FALLBACK: Build visible folders on-the-fly if cache is empty or invalidated
-    return buildVisibleFoldersOnTheFly($userId);
+    $visibleFoldersCache[$userId] = buildVisibleFoldersOnTheFly($userId);
+    return $visibleFoldersCache[$userId];
+}
+
+/**
+ * Build a fast lookup index for visible folder IDs and personal folders.
+ *
+ * @param int $userId The ID of the user
+ * @return array{ids: array<int, bool>, personal: array<int, bool>}
+ */
+function getUserVisibleFoldersIndex(int $userId): array
+{
+    static $visibleFoldersIndexCache = [];
+
+    if (isset($visibleFoldersIndexCache[$userId])) {
+        return $visibleFoldersIndexCache[$userId];
+    }
+
+    $index = [
+        'ids' => [],
+        'personal' => [],
+    ];
+
+    foreach (getUserVisibleFolders($userId) as $folder) {
+        $folderId = (int) ($folder['id'] ?? 0);
+        if ($folderId <= 0) {
+            continue;
+        }
+
+        $index['ids'][$folderId] = true;
+        if ((int) ($folder['perso'] ?? 0) === 1) {
+            $index['personal'][$folderId] = true;
+        }
+    }
+
+    $visibleFoldersIndexCache[$userId] = $index;
+    return $visibleFoldersIndexCache[$userId];
 }
 
 /**
@@ -7983,8 +8047,16 @@ function buildVisibleFoldersOnTheFly(int $userId): array
  */
 function getRoleBasedAccess($session, int $treeId): array
 {
+    static $roleAccessCache = [];
+
     // Retrieve all role IDs assigned to the user
     $roles = array_column($session->get('system-array_roles'), 'id');
+    sort($roles);
+
+    $cacheKey = md5(implode(';', $roles)) . ':' . $treeId;
+    if (isset($roleAccessCache[$cacheKey])) {
+        return $roleAccessCache[$cacheKey];
+    }
 
     // Query the distinct access types defined for these roles on this folder
     $accessTypes = DB::queryFirstColumn(
@@ -7994,7 +8066,8 @@ function getRoleBasedAccess($session, int $treeId): array
     );
 
     if (empty($accessTypes)) {
-        return [false, false, false];
+        $roleAccessCache[$cacheKey] = [false, false, false];
+        return $roleAccessCache[$cacheKey];
     }
 
     // Resolve multiple types using the shared priority function (least permissive wins):
@@ -8005,13 +8078,27 @@ function getRoleBasedAccess($session, int $treeId): array
     }
 
     switch ($resolvedType) {
-        case 'W':    return [true,  true,  true];  // full write: edit + delete + create
-        case 'ND':   return [true,  false, true];  // no delete, can create
-        case 'NE':   return [false, true,  true];  // no edit, can create
-        case 'NDNE': return [false, false, true];  // no edit, no delete, can create
-        case 'R':    return [false, false, false]; // read only: no create either
-        default:     return [false, false, false];
+        case 'W':
+            $roleAccessCache[$cacheKey] = [true, true, true];
+            break;
+        case 'ND':
+            $roleAccessCache[$cacheKey] = [true, false, true];
+            break;
+        case 'NE':
+            $roleAccessCache[$cacheKey] = [false, true, true];
+            break;
+        case 'NDNE':
+            $roleAccessCache[$cacheKey] = [false, false, true];
+            break;
+        case 'R':
+            $roleAccessCache[$cacheKey] = [false, false, false];
+            break;
+        default:
+            $roleAccessCache[$cacheKey] = [false, false, false];
+            break;
     }
+
+    return $roleAccessCache[$cacheKey];
 }
 
 /**

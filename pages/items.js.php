@@ -455,7 +455,9 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         } catch (e) {}
 
         store.update('teampassApplication', function(teampassApplication) {
-            teampassApplication.jstreeForceRefresh = 1
+            // Search requests already invalidate client cache keys above.
+            // Keep server cache enabled to avoid expensive full tree rebuilds.
+            teampassApplication.jstreeForceRefresh = 0
             teampassApplication.folderTreeSearchTerm = searchValue
         })
 
