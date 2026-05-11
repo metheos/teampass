@@ -4717,7 +4717,10 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         }
 
         if (refresh_visible_folders === true) {
-            internalRefreshVisibleFolders(true, function(result) {
+            const forceVisibleFoldersRefresh = do_refresh === true ||
+                (store.get('teampassApplication') !== undefined && store.get('teampassApplication').jstreeForceRefresh === 1)
+
+            internalRefreshVisibleFolders(forceVisibleFoldersRefresh, function(result) {
                 if (result === false) {
                     return;
                 }
