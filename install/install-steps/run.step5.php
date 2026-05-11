@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Teampass - a collaborative passwords manager.
  * ---
@@ -27,14 +28,15 @@
  */
 
 require '../../vendor/autoload.php';
+
 use TeampassClasses\SuperGlobal\SuperGlobal;
 use TeampassClasses\PasswordManager\PasswordManager;
 
 // Get some data
-require_once __DIR__.'/../../includes/config/include.php';
+require_once __DIR__ . '/../../includes/config/include.php';
 // Load functions
 include_once(__DIR__ . '/../tp.functions.php');
-require_once __DIR__.'/install.functions.php';
+require_once __DIR__ . '/install.functions.php';
 
 $superGlobal = new SuperGlobal();
 
@@ -122,7 +124,6 @@ function checks($inputData): array
     $installer = new DatabaseInstaller($inputData, $installConfig);
     $response = $installer->handleAction();
     return $response;
-
 }
 
 class DatabaseInstaller
@@ -169,7 +170,7 @@ class DatabaseInstaller
         $engines = DB::query("SHOW ENGINES");
         $innodbAvailable = false;
         $innodbDefault = false;
-        
+
         foreach ($engines as $engine) {
             if (strtolower($engine['Engine']) === 'innodb') {
                 $innodbAvailable = true;
@@ -179,23 +180,23 @@ class DatabaseInstaller
                 }
             }
         }
-        
+
         if (!$innodbAvailable) {
             throw new Exception('InnoDB storage engine is not available. TeamPass requires InnoDB for proper operation.');
         }
-        
+
         // Récupérer le moteur par défaut actuel
         $defaultEngine = DB::queryFirstRow("SELECT @@default_storage_engine AS engine");
         $currentEngine = strtolower($defaultEngine['engine']);
-        
+
         // Si le moteur par défaut n'est pas InnoDB, le définir pour cette session
         if ($currentEngine !== 'innodb') {
             DB::query("SET default_storage_engine = InnoDB");
-            
+
             // Log pour information
             error_log("TeamPass Installation: Changed default storage engine from {$currentEngine} to InnoDB");
         }
-        
+
         return [
             'innodb_available' => $innodbAvailable,
             'innodb_default' => $innodbDefault,
@@ -206,7 +207,8 @@ class DatabaseInstaller
     }
 
     // Migrate to utf8mb4
-    private function migrateToUtf8mb4() {
+    private function migrateToUtf8mb4()
+    {
         // Récupérer toutes les tables du préfixe
         $tables = DB::query(
             "SELECT TABLE_NAME 
@@ -217,10 +219,10 @@ class DatabaseInstaller
             $this->inputData['dbName'],
             $this->inputData['tablePrefix'] . '%'
         );
-        
+
         foreach ($tables as $table) {
             $tableName = $table['TABLE_NAME'];
-            
+
             // Convertir la table en utf8mb4
             DB::query(
                 "ALTER TABLE `" . $tableName . "` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci",
@@ -232,10 +234,10 @@ class DatabaseInstaller
     private function utf8()
     {
         DB::query(
-            "ALTER DATABASE %b DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", 
+            "ALTER DATABASE %b DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci",
             $this->inputData['dbName']
         );
-        
+
         // Configurer la connexion actuelle
         DB::query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
     }
@@ -282,7 +284,7 @@ class DatabaseInstaller
                 KEY `encryption_version` (`encryption_version`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
         );
-    
+
         // Indexes exist?
         $keyExists = DB::queryFirstField(
             "SELECT COUNT(1) 
@@ -292,7 +294,7 @@ class DatabaseInstaller
                 AND index_name IN ('object_id_idx', 'user_id_idx')",
             $this->inputData['tablePrefix'] . 'sharekeys_items'
         );
-    
+
         if (intval($keyExists) === 0) {
             // Add missing indexes
             DB::query(
@@ -318,7 +320,7 @@ class DatabaseInstaller
                 KEY `encryption_version` (`encryption_version`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
         );
-    
+
         // Indexes exist?
         $keyExists = DB::queryFirstField(
             "SELECT COUNT(1) 
@@ -328,7 +330,7 @@ class DatabaseInstaller
                 AND index_name IN ('object_id_idx', 'user_id_idx')",
             $this->inputData['tablePrefix'] . 'sharekeys_logs'
         );
-    
+
         if (intval($keyExists) === 0) {
             // Add missing indexes
             DB::query(
@@ -423,7 +425,8 @@ class DatabaseInstaller
             `deleted_at` varchar(30) NULL,
             PRIMARY KEY (`id`),
             KEY `restricted_inactif_idx` (`restricted_to`,`inactif`),
-            INDEX items_perso_id_idx (`perso`, `id`)
+            INDEX items_perso_id_idx (`perso`, `id`),
+            INDEX items_folder_state_label_idx (`id_tree`, `inactif`, `deleted_at`, `label`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
         );
     }
@@ -442,10 +445,11 @@ class DatabaseInstaller
             `old_value` MEDIUMTEXT NULL DEFAULT NULL,
             `encryption_type` VARCHAR(20) NOT NULL DEFAULT 'not_set',
             PRIMARY KEY (`increment_id`),
-            INDEX log_items_item_action_user_idx (`id_item`, `action`, `id_user`)
+            INDEX log_items_item_action_user_idx (`id_item`, `action`, `id_user`),
+            INDEX log_items_item_action_date_idx (`id_item`, `action`, `date`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
         );
-    
+
         // Indexes exist?
         $keyExists = DB::queryFirstField(
             "SELECT COUNT(1) 
@@ -455,7 +459,7 @@ class DatabaseInstaller
                 AND index_name IN ('teampass_log_items_id_item_IDX')",
             $this->inputData['tablePrefix'] . 'log_items'
         );
-    
+
         if (intval($keyExists) === 0) {
             // Add missing indexes
             DB::query(
@@ -483,7 +487,7 @@ class DatabaseInstaller
         );
 
         // include constants
-        require_once __DIR__.'/../../includes/config/include.php';
+        require_once __DIR__ . '/../../includes/config/include.php';
 
         $aMiscVal = array(
             array('admin', 'max_latest_items', '10'),
@@ -849,7 +853,7 @@ class DatabaseInstaller
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
         );
 
-        require_once __DIR__.'/../../includes/config/include.php';
+        require_once __DIR__ . '/../../includes/config/include.php';
 
         // Hash password
         $passwordManager = new PasswordManager();
@@ -857,7 +861,7 @@ class DatabaseInstaller
 
         // check that admin accounts doesn't exist
         $adminExists = DB::queryFirstField(
-            "SELECT COUNT(*) FROM ".$this->inputData['tablePrefix']."users WHERE login = %s",
+            "SELECT COUNT(*) FROM " . $this->inputData['tablePrefix'] . "users WHERE login = %s",
             'admin'
         );
 
@@ -891,10 +895,10 @@ class DatabaseInstaller
 
         // check that API doesn't exist
         $apiUserExists = DB::queryFirstField(
-            "SELECT COUNT(*) FROM ".$this->inputData['tablePrefix']."users WHERE id = %i",
+            "SELECT COUNT(*) FROM " . $this->inputData['tablePrefix'] . "users WHERE id = %i",
             API_USER_ID
         );
-        
+
         if (intval($apiUserExists) === 0) {
             DB::insert($this->inputData['tablePrefix'] . 'users', [
                 'id'                     => API_USER_ID,
@@ -917,7 +921,7 @@ class DatabaseInstaller
 
         // check that OTV doesn't exist
         $otvUserExists = DB::queryFirstField(
-            "SELECT COUNT(*) FROM ".$this->inputData['tablePrefix']."users WHERE id = %i",
+            "SELECT COUNT(*) FROM " . $this->inputData['tablePrefix'] . "users WHERE id = %i",
             OTV_USER_ID
         );
 
@@ -1044,7 +1048,7 @@ class DatabaseInstaller
             DB::insert($this->inputData['tablePrefix'] . 'roles_title', [
                 'id'             => null,
                 'title'          => 'Default',
-                'allow_pw_change'=> 0,
+                'allow_pw_change' => 0,
                 'complexity'     => 48,
                 'creator_id'     => 0
             ]);
@@ -1061,6 +1065,7 @@ class DatabaseInstaller
             `folder_id` int(12) NOT NULL,
             `type` varchar(5) NOT NULL DEFAULT 'R',
             KEY `role_id_idx` (`role_id`),
+            KEY `folder_role_type_idx` (`folder_id`, `role_id`, `type`),
             UNIQUE KEY `idx_role_folder_unique` (`role_id`, `folder_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
         );
@@ -1115,7 +1120,9 @@ class DatabaseInstaller
             `increment_id` int(12) NOT NULL AUTO_INCREMENT,
             `role_id` int(12) NOT NULL,
             `item_id` int(12) NOT NULL,
-            PRIMARY KEY (`increment_id`)
+            PRIMARY KEY (`increment_id`),
+            KEY `item_id_idx` (`item_id`),
+            KEY `role_item_idx` (`role_id`, `item_id`)
             ) CHARSET=utf8;'
         );
     }
@@ -1249,7 +1256,8 @@ class DatabaseInstaller
             `data_iv` text NOT NULL,
             `encryption_type` VARCHAR(20) NOT NULL DEFAULT 'not_set',
             `is_mandatory` BOOLEAN NOT NULL DEFAULT FALSE ,
-            PRIMARY KEY (`id`)
+            PRIMARY KEY (`id`),
+            KEY `item_field_idx` (`item_id`, `field_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
         );
     }
@@ -1488,7 +1496,8 @@ class DatabaseInstaller
             `error_message` TEXT NULL DEFAULT NULL,
             PRIMARY KEY (`increment_id`),
             INDEX idx_finished (`finished_at`),
-            INDEX idx_progress (`is_in_progress`)
+            INDEX idx_progress (`is_in_progress`),
+            INDEX idx_item_finished (`item_id`, `finished_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
         );
     }
@@ -1838,5 +1847,4 @@ class DatabaseInstaller
     COMMENT='Network ACL rules for IPv4 whitelist and blacklist'"
         );
     }
-
 }

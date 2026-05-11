@@ -5737,6 +5737,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 'expired_item': itemExpired,
                 'restricted': itemRestricted,
                 'folder_access_level': store.get('teampassItem').hasAccessLevel,
+                'details_mode': actionType,
                 'page': 'items',
                 'rights': itemRights,
             };

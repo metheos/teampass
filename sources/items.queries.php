@@ -185,6 +185,26 @@ $inputData = dataSanitizer(
     $filters
 );
 
+/**
+ * Trim very large fields in read-only item details responses.
+ */
+function trimDetailsText(string $value, int $maxLength): string
+{
+    if ($maxLength <= 0) {
+        return '';
+    }
+
+    if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+        if (mb_strlen($value, 'UTF-8') > $maxLength) {
+            return mb_substr($value, 0, $maxLength, 'UTF-8');
+        }
+
+        return $value;
+    }
+
+    return strlen($value) > $maxLength ? substr($value, 0, $maxLength) : $value;
+}
+
 // List of teampass users ids (and current user id).
 $tpUsersIDs = [
     OTV_USER_ID,
@@ -2660,6 +2680,10 @@ switch ($inputData['type']) {
             filter_var(($dataReceived['folder_access_level']), FILTER_SANITIZE_FULL_SPECIAL_CHARS)
             : '';
         $post_item_rights = filter_var($dataReceived['rights'], FILTER_SANITIZE_NUMBER_INT);
+        $post_details_mode = isset($dataReceived['details_mode']) === true
+            ? filter_var(($dataReceived['details_mode']), FILTER_SANITIZE_FULL_SPECIAL_CHARS)
+            : 'show';
+        $isDetailsEditMode = $post_details_mode === 'edit';
 
         $pwIsEmptyNormal = false;
         $arrData = array();
@@ -2971,7 +2995,9 @@ switch ($inputData['type']) {
             $arrData['email'] = empty($dataItem['email']) === true ? '' : $dataItem['email'];
             $arrData['url'] = empty($dataItem['url']) === true ? '' : $dataItem['url'];
             $arrData['folder'] = $dataItem['id_tree'];
-            $arrData['description'] = $dataItem['description'];
+            $arrData['description'] = $isDetailsEditMode === true
+                ? (string) $dataItem['description']
+                : trimDetailsText((string) $dataItem['description'], 4000);
             $arrData['login'] = $dataItem['login'];
             $arrData['id_restricted_to'] = $listeRestriction;
             $arrData['id_restricted_to_roles'] = $listRestrictionRoles;
@@ -3127,7 +3153,9 @@ switch ($inputData['type']) {
                             $fieldsTmp,
                             array(
                                 'id' => intval($row['field_id']),
-                                'value' => $fieldText['string'],
+                                'value' => $isDetailsEditMode === true
+                                    ? $fieldText['string']
+                                    : trimDetailsText((string) $fieldText['string'], 1024),
                                 'encrypted' => (int) $fieldText['encrypted'],
                                 'parent_id' => intval($row['parent_id']),
                                 'type' => $row['field_type'],

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Teampass - a collaborative passwords manager.
  * ---
@@ -31,13 +32,13 @@ use TeampassClasses\Language\Language;
 use TeampassClasses\ConfigManager\ConfigManager;
 
 // Load functions
-require_once __DIR__.'/../sources/main.functions.php';
-require_once __DIR__.'/../sources/backup.functions.php';
+require_once __DIR__ . '/../sources/main.functions.php';
+require_once __DIR__ . '/../sources/backup.functions.php';
 
 // init
 loadClasses('DB');
 $superGlobal = new SuperGlobal();
-$lang = new Language(); 
+$lang = new Language();
 error_reporting(E_ERROR | E_PARSE);
 set_time_limit(600);
 $_SESSION['CPM'] = 1;
@@ -78,7 +79,7 @@ if ($db_link) {
 
 // Load libraries
 $superGlobal = new SuperGlobal();
-$lang = new Language(); 
+$lang = new Language();
 
 //---------------------------------------------------------------------
 
@@ -312,6 +313,48 @@ $res = checkIndexExist(
     $pre . 'cache_tree',
     'idx_user_id',
     "ADD INDEX idx_user_id (user_id)"
+);
+
+$res = checkIndexExist(
+    $pre . 'items',
+    'items_folder_state_label_idx',
+    "ADD INDEX items_folder_state_label_idx (id_tree, inactif, deleted_at, label)"
+);
+
+$res = checkIndexExist(
+    $pre . 'log_items',
+    'log_items_item_action_date_idx',
+    "ADD INDEX log_items_item_action_date_idx (id_item, action, date)"
+);
+
+$res = checkIndexExist(
+    $pre . 'restriction_to_roles',
+    'item_id_idx',
+    "ADD INDEX item_id_idx (item_id)"
+);
+
+$res = checkIndexExist(
+    $pre . 'restriction_to_roles',
+    'role_item_idx',
+    "ADD INDEX role_item_idx (role_id, item_id)"
+);
+
+$res = checkIndexExist(
+    $pre . 'roles_values',
+    'folder_role_type_idx',
+    "ADD INDEX folder_role_type_idx (folder_id, role_id, type)"
+);
+
+$res = checkIndexExist(
+    $pre . 'categories_items',
+    'item_field_idx',
+    "ADD INDEX item_field_idx (item_id, field_id)"
+);
+
+$res = checkIndexExist(
+    $pre . 'background_tasks',
+    'idx_item_finished',
+    "ADD INDEX idx_item_finished (item_id, finished_at)"
 );
 
 // Add invalidated_at column for per-user targeted cache invalidation
